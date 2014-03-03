@@ -204,7 +204,8 @@ Seeker.prototype.step = function(boundsObj){
 }
 
 
-Seeker.prototype.chemotaxis = function(positionsObj){
+Seeker.prototype.chemotaxis = function(arenaObj){
+    
     var midX = this.x,
         midY = this.y,
         maxX = midX + (this.size + 1),
@@ -212,24 +213,30 @@ Seeker.prototype.chemotaxis = function(positionsObj){
         minX = midX - (this.size + 1),
         minY = midY - (this.size + 1),
         positionsSensed = [],
-        beingsSensed = []
-
-    console.log("midX", midX)
-    console.log("midY", midY)
-    console.log("maxX", maxX)
-    console.log("maxY", maxY)
-    console.log("minX", minX)
-    console.log("minY", minY)
+        beingsSensed = [],
+        self = this;
 
     for(var x = minX; x <= maxX; x++){
+        if(x < 0) continue
         for(var y = minY; y <= maxY; y++){
-            positionsSensed.push([x,y])
-            if(positionsObj[x][y] !== undefined){
-                beingsSensed.push({pos:[x,y], being: positionsObj[x][y]})
+            if(y < 0) continue
+            if(arenaObj.positions[x] !== undefined){
+                if(arenaObj.positions[x][y] !== undefined){
+                    //Don't sense yourself
+                    arenaObj.positions[x][y].forEach(function(o,i){
+                        if(o.id !== self.id){
+                            beingsSensed.push({pos:[x,y], being: arenaObj.positions[x][y]})
+                        }
+                    })
+                    
+                }
             }
         }
     }
-    return positionsSensed, beingsSensed
+    if(beingsSensed.length > 0){
+        console.log(beingsSensed)
+    }
+    return beingsSensed
 }
 
 
