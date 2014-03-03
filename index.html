@@ -1,0 +1,91 @@
+<html>
+
+<head>
+    <title>Random Walk</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- Javascript Libraries -->
+    <script src="bower_components/jquery/jquery.min.js"></script>
+    <script src="bower_components/d3/d3.min.js"></script>
+    <script src="bower_components/bootstrap/dist/js/bootstrap.min.js"></script>
+
+    <!-- CSS Libraries -->
+    <link rel="stylesheet" type="text/css" href="bower_components\bootswatch\cerulean\bootstrap.min.css">
+    <link rel="stylesheet" type="text/css" href="bower_components\font-awesome\css\font-awesome.css">
+
+    <!-- Application Javascript -->
+    <script type="text/javascript" src="js/model.js"></script>
+    <script src="js/main.js"></script>
+    <!-- Application CSS -->
+    <style type="text/css">
+    body {
+        font-family:"FontAwesome";
+        margin-left: -20px;
+        margin-top: -20px;
+    }
+    circle {
+        fill: rgb(31, 119, 180);
+        fill-opacity: .25;
+        stroke: rgb(31, 119, 180);
+        stroke-width: 1px;
+    }
+    svg {
+        border: 1px solid grey;
+        border-radius: 3px;
+        background: lightgrey;
+    }
+
+    .seeker{
+        fill: red !important;
+    }
+
+    </style>
+    <!-- On-Ready Hook -->
+    <script>
+    $(function() {
+        main("#walk-container", 50,1)
+        var running = true
+        $('#toggle-running-btn').click(function() {
+            var handle = $(this)
+            if (running) {
+                timeManager.pauseSimulation()
+                handle.text("Resume simulation")
+                running = false
+            } else {
+                timeManager.startSimulation()
+                handle.text("Pause simulation")
+                running = true
+            }
+        })
+    })
+    </script>
+</head>
+
+<body class='container'>
+    <div class="row">
+        <div id='header'>
+            <h1>Random Walks
+                <small>with D3.js</small>
+            </h1>
+        </div>
+    </div>
+    <div class="row">
+        <div class='col-md-9' id="walk-container">
+        </div>
+        <div class='col-md-3' id='control-container'>
+            <pre>
+Area = 750 &upsilon;m x 500 &upsilon;m
+L<sub>x</sub> = 1 &upsilon;m
+L<sub>y</sub> = 1 &upsilon;m 
+&Delta;s = 1s
+            </pre>
+            <button id="toggle-running-btn" class='btn btn-primary' data-running=true>Pause simulation</button>
+        </div>
+    </div>
+    <div class='row'>
+        <div class='col-md-6'>
+            Metabolite diffusion visualized as a random walk in two dimensions.
+        </div>
+    </div>
+</body>
+
+</html>
