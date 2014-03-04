@@ -14,7 +14,7 @@ function main(container, numWalkers, numSeekers) {
     window.walkerNodes = svg.selectAll(".walker").data(arena.walkers)
 
     d3.range(numSeekers).map(function(i){arena.addSeeker({state: "E-coli"})})
-    window.seekerNodes = svg.selectAll(".seeker").data(arena.actors['seekers'])
+    window.seekerNodes = svg.selectAll(".seeker").data(arena.actors)
 
     walkerNodes.enter().append('circle')
         .attr("r", function(d){ return d.size })
@@ -35,24 +35,16 @@ function main(container, numWalkers, numSeekers) {
         walkerNodes = svg.selectAll(".walker").data(arena.walkers)
         walkerNodes.enter().append('circle')
             .attr("r", function(d){ return d.size })
-        //console.log(walkerNodes)
-        /* Update random walking nodes */
-        walkerNodes[0].forEach(function(o, i){
-            o.x = arena.walkers[i].x;
-            o.y = arena.walkers[i].y;
-        })
+        //Seperate creation of new nodes from node updates
         walkerNodes.attr("cx", function(d) { return d.x; })
             .attr("cy", function(d) { return d.y; })
             .attr("class", function(d) { return "walker "+d.state; })
         walkerNodes.exit().remove()
 
-        seekerNodes = svg.selectAll(".seeker").data(arena.actors['seekers'])
+        seekerNodes = svg.selectAll(".seeker").data(arena.actors)
         seekerNodes.enter().append('circle')
             .attr("r", function(d){ return d.size})
-        seekerNodes[0].forEach(function(o, i){
-            o.x = arena.walkers[i].x;
-            o.y = arena.walkers[i].y;
-        })
+        //Seperate creation of new nodes from node updates
         seekerNodes.attr("cx", function(d) { return d.x; })
             .attr("cy", function(d) { return d.y; })
             .attr("class", function(d) { return "seeker "+d.state; })

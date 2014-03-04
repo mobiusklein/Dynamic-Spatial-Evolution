@@ -9,9 +9,8 @@ function Arena(argObj){
     this.minY = argObj.minY;
     this.maxY = argObj.maxY;
     
-    this.actors = {seekers: []}
+    this.actors = []
     this.walkers = []
-
     this.save = argObj.save||false
     this.verbose = argObj.verbose||false
 
@@ -46,7 +45,7 @@ Arena.prototype.addSeeker = function(opts){
     opts = this.randomPositionWithin(opts)
     var seeker = new Seeker(opts)
     
-    this.actors['seekers'].push(seeker)
+    this.actors.push(seeker)
     
 }
 
@@ -62,15 +61,40 @@ Arena.prototype.tick = function(){
         this.history.push(this.positions);
     }
     this.positions = {}
+    var deceased = {}
     var self = this;
     this.walkers.forEach(function(obj, i){
         obj.step(self)
         arena.setPosition(obj)
     })
-    this.actors['seekers'].forEach(function(obj, i){
-        obj.step(self)
+
+    this.actors.forEach(function(obj, i){
+        dead = (obj.step(self))
+        dead.forEach(function(o){
+            console.log(o)
+            deceased[o.id] = true
+        })
         arena.setPosition(obj)
     })
+    //console.log(deceased)
+    var survivors = []
+    this.walkers.forEach(function(obj,i){
+        if(deceased[obj.id] === undefined){
+            survivors.push(obj)
+        } else {
+            obj.state = 'dead'
+        }
+    })
+    this.walkers = survivors;
+    survivors = []
+    this.actors.forEach(function(obj,i){
+        if(deceased[obj.id] === undefined){
+            survivors.push(obj)
+        } else {
+            obj.state = "dead"
+        }
+    })
+    this.actors = survivors
 }
 
 /* ===============================================
@@ -79,7 +103,7 @@ Arena.prototype.tick = function(){
    =============================================== */
 WALKER_COUNT = 0
 function Walker(argObj){
-    this.id = WALKER_COUNT
+    this.id = "WALKER " + WALKER_COUNT
     this.x = argObj.x;
     this.y = argObj.y;
     this.size = argObj.size === undefined ? 5 : argObj.size
@@ -143,7 +167,7 @@ var Seeker = function(argObj){
     Walker.call(this, argObj)
     
     //Override the Walker ID
-    this.id = SEEKER_COUNT
+    this.id = "SEEKER " + SEEKER_COUNT
 
     //Movement
     //Seekers have a facing in addition to Walker's .x and .y fields
@@ -181,7 +205,8 @@ Seeker.prototype.step = function(boundsObj){
     newEatenHistory[i] = val
     })
     this.lastEaten = newEatenHistory;
-    var tumbleProb = this.eaten > 2 ? 0.01 : 0.1;
+    this.eaten = 0
+    var tumbleProb = this.eaten > 1 ? 0.01 : 0.1;
     var actionChoice = Math.random();
     
     //Tumble and change facing
@@ -199,13 +224,55 @@ Seeker.prototype.step = function(boundsObj){
     this.y += newY
 
     this.age += 1
-
     this.within(boundsObj)
+
+    //Sense Beings
+    var closeThings = this.sense(boundsObj);
+    var edibles = []
+    closeThings.forEach(function(close){
+        close.being.forEach(function(o){
+            if(o.size < self.size){
+                self.totalFood += close.being.size
+                self.eaten += 1;
+                edibles.push(o)
+            }
+        })
+    })
+
+    return edibles
 }
 
 
-Seeker.prototype.chemotaxis = function(arenaObj){
-    
+Seeker.prototype.within = function(boundsObj, escape) {
+    escape = escape === undefined ? true : escape
+    if (this.x <= boundsObj.minX) {
+        if(escape) {
+            this.x += this.stepSize * 1 + this.size;
+            this.facing[0] *= -1
+        }
+        
+    } else if (this.x >= boundsObj.maxX) {
+        if(escape){
+            this.x -= this.stepSize * 1 + this.size;
+            this.facing[0] *= -1
+        }
+    }
+
+    if (this.y <= boundsObj.minY) {
+        if(escape) {
+            this.y += this.stepSize * 1 + this.size;
+            this.facing[1] *= -1
+        }
+    } else if (this.y >= boundsObj.maxY) {
+        if(escape){
+            this.facing[1] *= -1
+            this.y -= this.stepSize * 1 + this.size;
+        }
+
+    }
+}
+
+Seeker.prototype.sense = function(arenaObj){
     var midX = this.x,
         midY = this.y,
         maxX = midX + (this.size + 1),
@@ -233,9 +300,7 @@ Seeker.prototype.chemotaxis = function(arenaObj){
             }
         }
     }
-    if(beingsSensed.length > 0){
-        console.log(beingsSensed)
-    }
+
     return beingsSensed
 }
 
