@@ -39,15 +39,34 @@
         stroke: darkred;
     }
 
-    .glucose{
+    .starving{
+        fill: purple !important;
+    }
 
+    .selected{
+        stroke-width: 8px !important;
     }
 
     </style>
     <!-- On-Ready Hook -->
     <script>
+
+    function updateStatusTable(){
+        var statusTable = d3.select('#seeker-status');
+        var rows = statusTable.selectAll('tr').data(arena.actors)
+        rows.enter().append("tr")
+        rows.attr('class', function(d){return d.selected ? 'info' : ''})
+        var cells = rows.selectAll('td').data(function(row){
+            var vals = [{col:'ID', value: row.id}, {col:"Total Food", value: row.totalFood}, {col:'Age', value: row.age}]
+            return vals
+        })
+        cells.enter().append('td')
+        cells.text(function(d){return d.value})
+        rows.exit().remove()
+    }
+
     $(function() {
-        main("#walk-container", 50,1)
+        main("#walk-container", 50, 3, 5)
         var running = true
         $('#toggle-running-btn').click(function() {
             var handle = $(this)
@@ -61,6 +80,8 @@
                 running = true
             }
         })
+        updateStatusTable()
+        setInterval(updateStatusTable, 1000)
     })
     </script>
 </head>
@@ -68,22 +89,33 @@
 <body class='container'>
     <div class="row">
         <div id='header'>
-            <h1>Random Walks
-                <small>with D3.js</small>
+            <h1>Bacterial Simulation 
+                <small>Dynamic Spatial Evolution</small>
             </h1>
         </div>
     </div>
     <div class="row">
-        <div class='col-md-9' id="walk-container">
+        <div class='col-md-8' id="walk-container">
         </div>
-        <div class='col-md-3' id='control-container'>
+        <div class='col-md-4' id='control-container'>
             <pre>
 Area = 750 &upsilon;m x 500 &upsilon;m
 L<sub>x</sub> = 1 &upsilon;m
 L<sub>y</sub> = 1 &upsilon;m 
-&Delta;s = 1s
+&Delta;s = 1ms
             </pre>
-            <button id="toggle-running-btn" class='btn btn-primary' data-running=true>Pause simulation</button>
+            <button id="toggle-running-btn" class='btn btn-primary' data-running=true style='margin-bottom: 10px;'>Pause simulation</button>
+            <table class='table table-bordered'>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Total Food</th>
+                        <th>Age</th>
+                    </tr>
+                </thead>
+                <tbody id='seeker-status' ></tbody>
+            </table>
+
         </div>
     </div>
     <div class='row'>

@@ -11,6 +11,7 @@ function Arena(argObj){
     
     this.actors = []
     this.walkers = []
+    this.periodics = []
     this.save = argObj.save||false
     this.verbose = argObj.verbose||false
 
@@ -51,9 +52,19 @@ Arena.prototype.addSeeker = function(opts){
 
 Arena.prototype.randomPositionWithin = function(opts){
     opts = opts === undefined ? {} : opts
-    opts.x = Math.floor(Math.random() * this.maxX)
-    opts.y = Math.floor(Math.random() * this.maxY)
+    opts.x = opts.x||Math.floor(Math.random() * this.maxX)
+    opts.y = opts.y||Math.floor(Math.random() * this.maxY)
     return opts
+}
+
+Arena.prototype.addPeriodicWalker = function(opts){
+    //Get a position within to spawn from
+    opts = this.randomPositionWithin(opts)
+    //Set frequency in milliseconds
+    opts.frequency = opts.frequency||20;
+    var self = this
+    this.periodics.push({ intervalID: setInterval(function(){
+        self.addWalker(opts)},opts.frequency), data: opts})
 }
 
 Arena.prototype.tick = function(){
@@ -67,11 +78,10 @@ Arena.prototype.tick = function(){
         obj.step(self)
         arena.setPosition(obj)
     })
-
+    dead = []
     this.actors.forEach(function(obj, i){
         dead = (obj.step(self))
         dead.forEach(function(o){
-            console.log(o)
             deceased[o.id] = true
         })
         arena.setPosition(obj)
@@ -109,6 +119,7 @@ function Walker(argObj){
     this.size = argObj.size === undefined ? 5 : argObj.size
     this.stepSize = argObj.stepSize === undefined ? 1 : argObj.stepSize;
     this.state = argObj.state;
+    this.type = argObj.type
     
     this.age = 0;
 
@@ -173,18 +184,17 @@ var Seeker = function(argObj){
     //Seekers have a facing in addition to Walker's .x and .y fields
     this.facing = argObj.facing === undefined ? [1,1] : argObj.facing
     //A pair of the form [Recent Fed, No Recent Fed]
-    this.tumbleFrequency = argObj.tumbleFrequency
+    this.tumbleFrequency = argObj.tumbleFrequency||[0.01, 0.1]
 
     //Apply Seeker's defaults in place of Walker defaults
     this.size = argObj.size === undefined ? 15 : argObj.size
     this.stepSize = argObj.stepSize === undefined ? 2 : argObj.stepSize
 
     this.totalFood = 100;
-    this.minimumReplicationFoodThreshold = argObj.minimumReplicationFoodThreshold;
+    this.minimumReplicationFoodThreshold = argObj.minimumReplicationFoodThreshold||500;
 
-    this.BMR = argObj.BMR;
-    this.minimumReplicationDelay = argObj.minimumReplicationDelay;
-
+    this.BMR = argObj.BMR||0.01;
+    this.minimumReplicationDelay = argObj.minimumReplicationDelay||10;
 
     this.eaten = 0;
     this.lastEaten = [0, 0, 0, 0]
@@ -196,19 +206,23 @@ var Seeker = function(argObj){
 Seeker.prototype = Object.create(Walker.prototype);
 
 Seeker.prototype.step = function(boundsObj){
-    var newEatenHistory = []
+    this.totalFood -= this.BMR
+
+    if (this.totalFood > this.minimumReplicationFoodThreshold && this.age > this.minimumReplicationDelay){
+        this.replicate(boundsObj)
+        return [this]
+    }
+    else if (this.totalFood < 50){
+        this.state = 'starving'
+    } else {
+        this.state = ''
+    }
+
     var self = this
-    this.lastEaten.forEach(function(o, i){ 
-    var val = (i !== 0) ? 
-        self.lastEaten[i - 1]
-        : self.eaten; 
-    newEatenHistory[i] = val
-    })
-    this.lastEaten = newEatenHistory;
     this.eaten = 0
-    var tumbleProb = this.eaten > 1 ? 0.01 : 0.1;
+
+    var tumbleProb = this.eaten > 1 ? this.tumbleFrequency[0] : this.tumbleFrequency[1];
     var actionChoice = Math.random();
-    
     //Tumble and change facing
     if(actionChoice < tumbleProb){
         var newFacing = this.facing;
@@ -216,6 +230,25 @@ Seeker.prototype.step = function(boundsObj){
             this.facing = FACINGS[Math.floor(Math.random() * FACINGS.length)]
         }
     }
+
+    //Sense Beings
+    var closeThings = this.sense(boundsObj);
+    var edibles = []
+    closeThings.forEach(function(close){
+        close.being.forEach(function(o){
+            
+            // Need to determine if thing is close enough to eat 
+            // or adjust facing to chase
+
+            if(o.size < self.size){
+                //Not quite right
+                self.totalFood += o.size
+                self.eaten += 1;
+                edibles.push(o)
+            }
+        })
+    })
+
     //Compute step magnitude and apply facing direction
     var newX = this.stepSize * this.facing[0]
     var newY = this.stepSize * this.facing[1]
@@ -226,23 +259,18 @@ Seeker.prototype.step = function(boundsObj){
     this.age += 1
     this.within(boundsObj)
 
-    //Sense Beings
-    var closeThings = this.sense(boundsObj);
-    var edibles = []
-    closeThings.forEach(function(close){
-        close.being.forEach(function(o){
-            if(o.size < self.size){
-                self.totalFood += close.being.size
-                self.eaten += 1;
-                edibles.push(o)
-            }
-        })
-    })
 
-    return edibles
+    if(this.totalFood < 0){
+        return [this]
+    } else {
+        return edibles
+    }
 }
 
-
+/*
+    As the Walker implementation, but also reverse the facing along
+    the impinging axis
+*/
 Seeker.prototype.within = function(boundsObj, escape) {
     escape = escape === undefined ? true : escape
     if (this.x <= boundsObj.minX) {
@@ -283,6 +311,7 @@ Seeker.prototype.sense = function(arenaObj){
         beingsSensed = [],
         self = this;
 
+    // Scan the surrounding space
     for(var x = minX; x <= maxX; x++){
         if(x < 0) continue
         for(var y = minY; y <= maxY; y++){
@@ -304,6 +333,16 @@ Seeker.prototype.sense = function(arenaObj){
     return beingsSensed
 }
 
+//STUB
+Seeker.prototype.death = function(boundsObj){
+    
+}
+
+//STUB
+Seeker.prototype.replicate = function(boundsObj){
+    boundsObj.addSeeker(this)
+    boundsObj.addSeeker(this)
+}
 
 /*
 Export Classes for Node 
