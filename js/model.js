@@ -9,6 +9,8 @@ function Arena(argObj){
     this.minY = argObj.minY;
     this.maxY = argObj.maxY;
     
+    this.ticker = 0
+
     this.actors = []
     this.walkers = []
     this.periodics = []
@@ -62,18 +64,25 @@ Arena.prototype.addPeriodicWalker = function(opts){
     opts = this.randomPositionWithin(opts)
     //Set frequency in milliseconds
     opts.frequency = opts.frequency||20;
+    var f = function(){self.addWalker(opts)}
+    f.frequency = opts.frequency
     var self = this
-    this.periodics.push({ intervalID: setInterval(function(){
-        self.addWalker(opts)},opts.frequency), data: opts})
+    this.periodics.push(f)
 }
 
 Arena.prototype.tick = function(){
     if(this.save){
         this.history.push(this.positions);
     }
+    this.ticker += 1
     this.positions = {}
     var deceased = {}
     var self = this;
+    this.periodics.forEach(function(func,i){
+        if(self.ticker % func.frequency === 0){
+            func()
+        }
+    })
     this.walkers.forEach(function(obj, i){
         obj.step(self)
         arena.setPosition(obj)
@@ -113,7 +122,7 @@ Arena.prototype.tick = function(){
    =============================================== */
 WALKER_COUNT = 0
 function Walker(argObj){
-    this.id = "WALKER " + WALKER_COUNT
+    this.id = "walker-" + WALKER_COUNT
     this.x = argObj.x;
     this.y = argObj.y;
     this.size = argObj.size === undefined ? 5 : argObj.size
@@ -178,7 +187,7 @@ var Seeker = function(argObj){
     Walker.call(this, argObj)
     
     //Override the Walker ID
-    this.id = "SEEKER " + SEEKER_COUNT
+    this.id = "seeker-" + SEEKER_COUNT
 
     //Movement
     //Seekers have a facing in addition to Walker's .x and .y fields
