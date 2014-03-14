@@ -1,3 +1,10 @@
+// require Node modules for offline use
+try{
+
+} catch(err) {
+
+}
+
 /* ===============================================
     Arena
     Defines an object which describes an area which actors
@@ -10,6 +17,8 @@ function Arena(argObj){
     this.maxY = argObj.maxY;
     
     this.ticker = 0
+
+    this.creationQueue = []
 
     this.actors = []
     this.walkers = []
@@ -35,6 +44,11 @@ Arena.prototype.setPosition = function(obj){
 }
 
 Arena.prototype.addWalker = function(opts){
+    var self = this
+    this.creationQueue.push(function(){self._addWalker(opts)})
+}
+
+Arena.prototype._addWalker = function(opts){
     opts = opts === undefined ? {} : opts;
     opts = this.randomPositionWithin(opts)
     var walker = new Walker(opts)
@@ -44,6 +58,11 @@ Arena.prototype.addWalker = function(opts){
 }
 
 Arena.prototype.addSeeker = function(opts){
+    var self = this
+    this.creationQueue.push(function(){self.addSeeker(opts)})
+}
+
+Arena.prototype._addSeeker = function(opts){
     opts = opts === undefined ? {} : opts;
     opts = this.randomPositionWithin(opts)
     var seeker = new Seeker(opts)
@@ -52,22 +71,22 @@ Arena.prototype.addSeeker = function(opts){
     
 }
 
-Arena.prototype.randomPositionWithin = function(opts){
-    opts = opts === undefined ? {} : opts
-    opts.x = opts.x||Math.floor(Math.random() * this.maxX)
-    opts.y = opts.y||Math.floor(Math.random() * this.maxY)
-    return opts
-}
-
 Arena.prototype.addPeriodicWalker = function(opts){
     //Get a position within to spawn from
     opts = this.randomPositionWithin(opts)
     //Set frequency in milliseconds
     opts.frequency = opts.frequency||20;
-    var f = function(){self.addWalker(opts)}
+    var f = function(){self._addWalker(opts)}
     f.frequency = opts.frequency
     var self = this
     this.periodics.push(f)
+}
+
+Arena.prototype.randomPositionWithin = function(opts){
+    opts = opts === undefined ? {} : opts
+    opts.x = Math.floor(opts.x)||Math.floor(Math.random() * this.maxX)
+    opts.y = Math.floor(opts.y)||Math.floor(Math.random() * this.maxY)
+    return opts
 }
 
 Arena.prototype.tick = function(){
@@ -78,11 +97,6 @@ Arena.prototype.tick = function(){
     this.positions = {}
     var deceased = {}
     var self = this;
-    this.periodics.forEach(function(func,i){
-        if(self.ticker % func.frequency === 0){
-            func()
-        }
-    })
     this.walkers.forEach(function(obj, i){
         obj.step(self)
         arena.setPosition(obj)
@@ -114,6 +128,15 @@ Arena.prototype.tick = function(){
         }
     })
     this.actors = survivors
+    this.periodics.forEach(function(func,i){
+        if(self.ticker % func.frequency === 0){
+            func()
+        }
+    })
+    while(this.creationQueue.length > 0){
+        var f = this.creationQueue.shift()
+        //f()
+    }
 }
 
 /* ===============================================
@@ -338,7 +361,7 @@ Seeker.prototype.sense = function(arenaObj){
             }
         }
     }
-
+    if(beingsSensed.length > 1){ console.log(beingsSensed) }
     return beingsSensed
 }
 
@@ -349,8 +372,8 @@ Seeker.prototype.death = function(boundsObj){
 
 //STUB
 Seeker.prototype.replicate = function(boundsObj){
-    boundsObj.addSeeker(this)
-    boundsObj.addSeeker(this)
+    boundsObj._addSeeker(this)
+    boundsObj._addSeeker(this)
 }
 
 /*
