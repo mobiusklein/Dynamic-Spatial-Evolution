@@ -4,6 +4,55 @@ try{
 } catch(err) {
 
 }
+/*
+    Container is an object such as an Arena's .positions sparse
+    matrix. 
+*/
+CIRCLE = 'circle'
+RECTANGLE = 'rectangle'
+function fillRegionWithPolygon(container, polygonObj, shape){
+    if(shape === undefined){
+        shape = 'circle'
+    } 
+    /*
+        At low resolution with a discrete spatial scale, 
+        a circle is indistinguishable from a diamond or 
+        low n-gon. Therefore to avoid high computational 
+        complexity, we can use a simple hexagon packing 
+        algorithm.
+
+        size = 1
+        
+        OO
+
+        size = 2
+
+         OO
+        OOOO
+         OO
+
+        size = 3
+          
+         OOOO
+        OOOOOO
+         OOOO
+          
+
+        size = 4
+           
+          OOOO
+         OOOOOO
+        OOOOOOOO
+         OOOOOO
+          OOOO
+           
+
+           
+    */
+    if(shape === 'circle'){
+        
+    }
+}
 
 /* ===============================================
     Arena
