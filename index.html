@@ -1,5 +1,4 @@
 <html>
-
 <head>
     <title>Bacterial Simulation</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -13,7 +12,8 @@
     <link rel="stylesheet" type="text/css" href="bower_components\font-awesome\css\font-awesome.css">
 
     <!-- Application Javascript -->
-    <script type="text/javascript" src="js/model.js"></script>
+    <!--<script type="text/javascript" src="js/model.js"></script>-->
+    <script type="text/javascript" src="coffee/model.js"></script>
     <script src="js/main.js"></script>
     <!-- Application CSS -->
     <style type="text/css">
@@ -66,13 +66,8 @@
         rows.exit().remove()
     }
 
-    function resetSimulation(){
-        $("#simulation-container").html('')
-        main("#simulation-container", 50, 3, 5)
-    }
-
     $(function() {
-        main("#simulation-container", 50, 3, 5)
+        main("#simulation-container", 0, 1, 0)
         var running = true
         $('#toggle-running-btn').click(function() {
             var handle = $(this)
@@ -88,6 +83,7 @@
         })
         updateStatusTable()
         setInterval(updateStatusTable, 1000)
+        $('#toggle-running-btn').click()
     })
     </script>
 </head>
@@ -104,13 +100,10 @@
         <div class='col-md-8' id="simulation-container">
         </div>
         <div class='col-md-4' id='control-container'>
-            <pre>
-Area = 750 &upsilon;m x 500 &upsilon;m
-L<sub>x</sub> = 1 &upsilon;m
-L<sub>y</sub> = 1 &upsilon;m 
-&Delta;s = 1ms
-            </pre>
-            <button id="toggle-running-btn" class='btn btn-primary' data-running=true style='margin-bottom: 10px;'>Pause simulation</button>
+            <div class='clearfix'>
+                <button id="toggle-running-btn" class='btn btn-primary btn' data-running=true style='margin: 10px; float:left;'>Pause simulation</button>
+                <button id="toggle-food-button" class='btn btn-primary' style='margin: 10px; float:left;'>Food Dropper</button>
+            </div>
             <table class='table table-bordered'>
                 <thead>
                     <tr>

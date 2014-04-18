@@ -15,17 +15,32 @@ function clickSeekerHandler(d, i, j){
     d.selected = true
 }
 
+
+function setSimulationClickHandler(func){
+    svg.on('click', null)
+    svg.on('click', func)
+}
+
+function clickAddNutrientHandler(){
+    var pos = d3.mouse(this)
+    d3.range(500).map(function(i){arena.addWalker({type: "glucose", size: 1, x: pos[0], y:pos[1], stepSize: 10})})
+}
+
+function clickGetPositionHandler(){
+    console.log(d3.mouse(this))
+}
+
+svg = {}
+walkerNodes = [];
+seekerNodes = [];
+
+
 function main(container, numWalkers, numSeekers, numPeriodicFood) {
     svg = d3.select(container).append("svg").attr('width', arena.maxX).attr('height', arena.maxY)
-
-    /* Externalize To the Window */
-    d3.range(numWalkers).map(function(i){arena.addWalker({type: "glucose"})})
-    window.walkerNodes = svg.selectAll(".walker").data(arena.walkers)
-
-    d3.range(numPeriodicFood).map(function(i){arena.addPeriodicWalker({type: "glucose", frequency: 500})})
-
+    svg.on('click', clickAddNutrientHandler)
+    d3.range(numWalkers).map(function(i){arena.addWalker({type: "glucose", size: 1, stepSize: 10 })})
+    d3.range(numPeriodicFood).map(function(i){arena.addPeriodicWalker({type: "glucose", size: 1, frequency: 100, stepSize: 10})})
     d3.range(numSeekers).map(function(i){arena.addSeeker({type: "E-coli"})})
-    window.seekerNodes = svg.selectAll(".seeker").data(arena.actors)
 
     function tick(d){
         /* Run the model forward one time step */
