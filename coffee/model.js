@@ -268,7 +268,7 @@ Seeker = (function(_super) {
   }
 
   Seeker.prototype.step = function(boundsObj) {
-    var actionChoice, closeThings, edibles, newFacing, newX, newY, self, tumbleProb, _ref;
+    var actionChoice, closeThings, edibles, newFacing, newX, newY, self, tumbleProb;
     this.totalFood -= this.BMR;
     if (this.totalFood > this.minimumReplicationFoodThreshold && this.age > this.minimumReplicationDelay) {
       this.replicate(boundsObj);
@@ -291,20 +291,16 @@ Seeker = (function(_super) {
     closeThings = this.sense(boundsObj);
     edibles = [];
     closeThings.forEach(function(close) {
-      close.being.forEach(function(o) {
+      return close.being.forEach(function(o) {
         if (o.edible) {
           self.totalFood += o.size;
           self.eaten += 1;
-          edibles.push(o);
+          return edibles.push(o);
         }
       });
     });
     newX = this.stepSize * this.facing[0];
     newY = this.stepSize * this.facing[1];
-    _ref = boundsObj.pathClear(self, {
-      x: newX,
-      y: newY
-    }), newX = _ref[0], newY = _ref[1];
     this.x += newX;
     this.y += newY;
     this.age += 1;

@@ -273,16 +273,12 @@ class Seeker extends Walker
           self.totalFood += o.size
           self.eaten += 1
           edibles.push o
-        return
-
-      return
-
     
     #Compute step magnitude and apply facing direction
     newX = @stepSize * @facing[0]
     newY = @stepSize * @facing[1]
 
-    [newX, newY] = boundsObj.pathClear(self, {x:newX, y:newY})
+#    [newX, newY] = boundsObj.pathClear(self, {x:newX, y:newY})
     
     @x += newX
     @y += newY
