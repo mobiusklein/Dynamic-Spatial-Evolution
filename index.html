@@ -1,5 +1,4 @@
 <html>
-
 <head>
     <title>Bacterial Simulation</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -13,7 +12,8 @@
     <link rel="stylesheet" type="text/css" href="bower_components\font-awesome\css\font-awesome.css">
 
     <!-- Application Javascript -->
-    <script type="text/javascript" src="js/model.js"></script>
+    <!--<script type="text/javascript" src="js/model.js"></script>-->
+    <script type="text/javascript" src="coffee/model.js"></script>
     <script src="js/main.js"></script>
     <!-- Application CSS -->
     <style type="text/css">
@@ -83,6 +83,7 @@
         })
         updateStatusTable()
         setInterval(updateStatusTable, 1000)
+        $('#toggle-running-btn').click()
     })
     </script>
 </head>
