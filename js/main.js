@@ -23,7 +23,7 @@ function setSimulationClickHandler(func){
 
 function clickAddNutrientHandler(){
     var pos = d3.mouse(this)
-    d3.range(500).map(function(i){arena.addWalker({type: "glucose", size: 1, x: pos[0], y:pos[1], stepSize: 10})})
+    d3.range(500).map(function(i){arena.addWalker({type: "glucose", size: 1, x: pos[0], y:pos[1]})})
 }
 
 function clickGetPositionHandler(){

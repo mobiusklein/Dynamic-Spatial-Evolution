@@ -107,22 +107,20 @@ Arena = (function() {
 
   Arena.prototype.pathClear = function(obj, newPos) {
     var solid, x, y, _i, _j, _ref, _ref1, _ref2, _ref3;
-    console.log(obj);
-    console.log("New Pos", newPos.x, newPos.y);
     for (x = _i = _ref = obj.x, _ref1 = obj.x + newPos.x; _ref <= _ref1 ? _i <= _ref1 : _i >= _ref1; x = _ref <= _ref1 ? ++_i : --_i) {
       if (this.positions[x] == null) {
         this.positions[x] = {};
       }
-    }
-    for (y = _j = _ref2 = obj.y, _ref3 = obj.y + newPos.y; _ref2 <= _ref3 ? _j <= _ref3 : _j >= _ref3; y = _ref2 <= _ref3 ? ++_j : --_j) {
-      if (this.positions[x][y] == null) {
-        this.positions[x][y] = [];
-      }
-      solid = this.positions[x][y].some(function(i) {
-        return i.solid;
-      });
-      if (solid) {
-        return [x - obj.x, y - obj.y];
+      for (y = _j = _ref2 = obj.y, _ref3 = obj.y + newPos.y; _ref2 <= _ref3 ? _j <= _ref3 : _j >= _ref3; y = _ref2 <= _ref3 ? ++_j : --_j) {
+        if (this.positions[x][y] == null) {
+          this.positions[x][y] = [];
+        }
+        solid = this.positions[x][y].some(function(i) {
+          return i.solid;
+        });
+        if (solid) {
+          return [x - obj.x, y - obj.y];
+        }
       }
     }
     return [newPos.x, newPos.y];
@@ -197,9 +195,13 @@ Walker = (function() {
   Walker.WALKER_COUNT = 0;
 
   Walker.prototype.step = function(boundsObj) {
-    var newX, newY;
+    var newX, newY, _ref;
     newX = Walker.random(this.stepSize);
     newY = Walker.random(this.stepSize);
+    _ref = boundsObj.pathClear(this, {
+      x: newX,
+      y: newY
+    }), newX = _ref[0], newY = _ref[1];
     this.x += newX;
     this.y += newY;
     this.age += 1;
@@ -254,13 +256,18 @@ Seeker = (function(_super) {
     this.id = "seeker-" + Seeker.SEEKER_COUNT;
     this.edible = false;
     this.solid = true;
-    this.facing = (argObj.facing === undefined ? [1, 1] : argObj.facing);
+    this.facing = (argObj.facing == null ? [1, 1] : argObj.facing);
     this.tumbleFrequency = argObj.tumbleFrequency || [0.01, 0.1];
     this.size = (argObj.size === undefined ? 5 : argObj.size);
     this.stepSize = (argObj.stepSize === undefined ? 2 : argObj.stepSize);
     this.totalFood = 100;
     this.minimumReplicationFoodThreshold = argObj.minimumReplicationFoodThreshold || 500;
-    this.BMR = argObj.BMR || 0.01;
+    this.BMR = argObj.BMR || function(metabolism, optsObj) {
+      if (metabolism == null) {
+        metabolism = 0.01;
+      }
+      return this.totalFood -= metabolism;
+    };
     this.minimumReplicationDelay = argObj.minimumReplicationDelay || 10;
     this.eaten = 0;
     this.lastEaten = [0, 0, 0, 0];
@@ -268,8 +275,8 @@ Seeker = (function(_super) {
   }
 
   Seeker.prototype.step = function(boundsObj) {
-    var actionChoice, closeThings, edibles, newFacing, newX, newY, self, tumbleProb;
-    this.totalFood -= this.BMR;
+    var actionChoice, closeThings, newFacing, newX, newY, remove, self, tumbleProb, _ref;
+    this.BMR();
     if (this.totalFood > this.minimumReplicationFoodThreshold && this.age > this.minimumReplicationDelay) {
       this.replicate(boundsObj);
       return [this];
@@ -289,27 +296,30 @@ Seeker = (function(_super) {
       }
     }
     closeThings = this.sense(boundsObj);
-    edibles = [];
+    remove = [];
     closeThings.forEach(function(close) {
-      return close.being.forEach(function(o) {
-        if (o.edible) {
+      return close.forEach(function(o) {
+        if (o.edible && !o.mark) {
           self.totalFood += o.size;
           self.eaten += 1;
-          return edibles.push(o);
+          return remove.push(o);
         }
       });
     });
     newX = this.stepSize * this.facing[0];
     newY = this.stepSize * this.facing[1];
+    _ref = boundsObj.pathClear(self, {
+      x: newX,
+      y: newY
+    }), newX = _ref[0], newY = _ref[1];
     this.x += newX;
     this.y += newY;
     this.age += 1;
     this.within(boundsObj);
     if (this.totalFood < 0) {
-      return [this];
-    } else {
-      return edibles;
+      remove.push(this);
     }
+    return remove;
   };
 
   Seeker.prototype.within = function(boundsObj, escape) {
@@ -347,14 +357,13 @@ Seeker = (function(_super) {
   };
 
   Seeker.prototype.sense = function(arenaObj) {
-    var beingsSensed, maxX, maxY, midX, midY, minX, minY, positionsSensed, self, x, y, _i, _j;
+    var beingsSensed, maxX, maxY, midX, midY, minX, minY, other, self, x, y, _i, _j, _k, _len, _ref;
     midX = this.x;
     midY = this.y;
     maxX = midX + (this.size + 1);
     maxY = midY + (this.size + 1);
     minX = midX - (this.size + 1);
     minY = midY - (this.size + 1);
-    positionsSensed = [];
     beingsSensed = [];
     self = this;
     for (x = _i = minX; minX <= maxX ? _i <= maxX : _i >= maxX; x = minX <= maxX ? ++_i : --_i) {
@@ -373,20 +382,16 @@ Seeker = (function(_super) {
         }
         if (arenaObj.positions[x] != null) {
           if (arenaObj.positions[x][y] != null) {
-            arenaObj.positions[x][y].forEach(function(o, i) {
-              if (o.id !== self.id) {
-                beingsSensed.push({
-                  pos: [x, y],
-                  being: arenaObj.positions[x][y]
-                });
+            _ref = arenaObj.positions[x][y];
+            for (_k = 0, _len = _ref.length; _k < _len; _k++) {
+              other = _ref[_k];
+              if (other.id !== this.id) {
+                beingsSensed.push(arenaObj.positions[x][y]);
               }
-            });
+            }
           }
         }
       }
-    }
-    if (beingsSensed.length > 1) {
-      console.log(beingsSensed);
     }
     return beingsSensed;
   };

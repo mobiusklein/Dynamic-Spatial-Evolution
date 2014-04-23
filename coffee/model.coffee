@@ -51,10 +51,8 @@ class Arena
     #
     #    SIZE positions on either side of the origin point  
     #
-    #console.log "Fill Start"
     minX = polygonObj.x - polygonObj.size
     minY = polygonObj.y - polygonObj.size
-    #throw RangeError("Not within container")  if minX < 0 or minY < 0
     minX = if minX >= 0 then minX else 0
     minY = if minY >= 0 then minY else 0
 
@@ -74,7 +72,6 @@ class Arena
         @positions[x][y] = []  if !@positions[x][y]?
         @positions[x][y].push polygonObj
 
-    #console.log "Fill End"
     @positions
 
   randomPositionWithin: (opts) ->
@@ -84,17 +81,15 @@ class Arena
     opts
 
   pathClear: (obj, newPos) ->
-    console.log(obj)
-    #console.log("Current Pos", obj.x. obj.y);
-    console.log("New Pos", newPos.x, newPos.y)
     for x in [obj.x..(obj.x + newPos.x)]
-       @positions[x] = {} if !@positions[x]?
+      @positions[x] = {} if !@positions[x]?
       for y in [obj.y..(obj.y + newPos.y)]
         @positions[x][y] = [] if !@positions[x][y]?
         solid = @positions[x][y].some((i)-> return i.solid)
         if(solid)
+          # Adjust the new coordinates to be in terms of change from the original position
           return [x - obj.x, y - obj.y]
-
+    # Didn't encounter any solid objects along the path
     return [newPos.x, newPos.y]
   tick: ->
     @history.push @positions  if @save
@@ -128,7 +123,6 @@ class Arena
       return
     @walkers = survivors
 
-
     survivors = []
     @actors.forEach (obj, i) ->
       if deceased[obj.id] is `undefined`
@@ -159,8 +153,10 @@ class Walker
     @stepSize = (if argObj.stepSize is `undefined` then 1 else argObj.stepSize)
     @state = argObj.state
     @type = argObj.type
+
     @edible = true
     @solid = false
+    
     @age = 0
     @mark = false
     Walker.WALKER_COUNT += 1
@@ -169,6 +165,7 @@ class Walker
   step: (boundsObj) ->
     newX = Walker.random(@stepSize)
     newY = Walker.random(@stepSize)
+    [newX, newY] = boundsObj.pathClear(this, {x:newX, y:newY})
     @x += newX
     @y += newY
     @age += 1
@@ -218,10 +215,7 @@ class Seeker extends Walker
     
     #Movement
     #Seekers have a facing in addition to Walker's .x and .y fields
-    @facing = (if argObj.facing is `undefined` then [
-      1
-      1
-    ] else argObj.facing)
+    @facing = (if !argObj.facing? then [1,1] else argObj.facing)
     
     #A pair of the form [Recent Fed, No Recent Fed]
     @tumbleFrequency = argObj.tumbleFrequency or [
@@ -234,14 +228,14 @@ class Seeker extends Walker
     @stepSize = (if argObj.stepSize is `undefined` then 2 else argObj.stepSize)
     @totalFood = 100
     @minimumReplicationFoodThreshold = argObj.minimumReplicationFoodThreshold or 500
-    @BMR = argObj.BMR or 0.01
+    @BMR = argObj.BMR or (metabolism = 0.01, optsObj) -> @totalFood -= metabolism
     @minimumReplicationDelay = argObj.minimumReplicationDelay or 10
     @eaten = 0
     @lastEaten = [0,0,0,0]
     Seeker.SEEKER_COUNT += 1
 
   step: (boundsObj) ->
-    @totalFood -= @BMR
+    @BMR()
     if @totalFood > @minimumReplicationFoodThreshold and @age > @minimumReplicationDelay
       @replicate boundsObj
       return [this]
@@ -261,33 +255,33 @@ class Seeker extends Walker
     
     #Sense Beings
     closeThings = @sense(boundsObj)
-    edibles = []
+    remove = []
     closeThings.forEach (close) ->
-      close.being.forEach (o) ->
+      close.forEach (o) ->
         
         # Need to determine if thing is close enough to eat 
         # or adjust facing to chase
-        if o.edible
+        if o.edible and not o.mark
           
           #Not quite right
           self.totalFood += o.size
           self.eaten += 1
-          edibles.push o
+          remove.push o
     
     #Compute step magnitude and apply facing direction
     newX = @stepSize * @facing[0]
     newY = @stepSize * @facing[1]
 
-#    [newX, newY] = boundsObj.pathClear(self, {x:newX, y:newY})
+    [newX, newY] = boundsObj.pathClear(self, {x:newX, y:newY})
     
     @x += newX
     @y += newY
     @age += 1
     @within boundsObj
     if @totalFood < 0
-      [this]
-    else
-      edibles
+      remove.push this
+    
+    return remove
 
   #
   #    As the Walker implementation, but also reverse the facing along
@@ -324,7 +318,6 @@ class Seeker extends Walker
     maxY = midY + (@size + 1)
     minX = midX - (@size + 1)
     minY = midY - (@size + 1)
-    positionsSensed = []
     beingsSensed = []
     self = this
     
@@ -339,16 +332,12 @@ class Seeker extends Walker
         if arenaObj.positions[x]?
           if arenaObj.positions[x][y]?
             
-            #Don't sense yourself
-            arenaObj.positions[x][y].forEach (o, i) ->
-              if o.id != self.id
-                beingsSensed.push
-                  pos: [x, y]
-                  being: arenaObj.positions[x][y]
+            for other in arenaObj.positions[x][y]
+              #Don't sense yourself
+              if other.id != @id
+                beingsSensed.push arenaObj.positions[x][y]
 
-              return
-
-    console.log beingsSensed  if beingsSensed.length > 1
+    #console.log beingsSensed  if beingsSensed.length > 1
     return beingsSensed
 
 
