@@ -6,7 +6,7 @@ var timeManager = {
     pauseSimulation: null
 }
 
-TICKINTERVAL = 1
+TICKINTERVAL = 50
 
 function clickSeekerHandler(d, i, j){
     $('.selected').removeClass('selected')
@@ -23,12 +23,19 @@ function setSimulationClickHandler(func){
 
 function clickAddNutrientHandler(){
     var pos = d3.mouse(this)
+    console.log("Adding Nutrients")
     d3.range(500).map(function(i){arena.addWalker({type: "glucose", size: 1, x: pos[0], y:pos[1]})})
+    console.log(arena.walkers)
 }
 
 function clickGetPositionHandler(){
     console.log(d3.mouse(this))
 }
+
+function zoomed() {
+    svg.attr("transform", "scale(" + d3.event.scale + ")");
+}
+var zoom = d3.behavior.zoom().scaleExtent([1, 10])
 
 svg = {}
 walkerNodes = [];
@@ -39,8 +46,8 @@ function main(container, numWalkers, numSeekers, numPeriodicFood) {
     svg = d3.select(container).append("svg").attr('width', arena.maxX).attr('height', arena.maxY)
     svg.on('click', clickAddNutrientHandler)
     d3.range(numWalkers).map(function(i){arena.addWalker({type: "glucose", size: 1, stepSize: 10 })})
-    d3.range(numPeriodicFood).map(function(i){arena.addPeriodicWalker({type: "glucose", size: 1, frequency: 100, stepSize: 10})})
-    d3.range(numSeekers).map(function(i){arena.addSeeker({type: "E-coli"})})
+    d3.range(numPeriodicFood).map(function(i){arena.addPeriodicWalker({type: "glucose", size: 1, frequency: 100})})
+    d3.range(numSeekers).map(function(i){arena.addSeeker({type: "E-coli", canEat: ["glucose"]})})
 
     function tick(d){
         /* Run the model forward one time step */

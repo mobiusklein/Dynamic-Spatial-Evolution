@@ -1,4 +1,26 @@
 # require Node modules for offline use
+if modules?
+  console.log "Running in Node Mode"
+  _ = require('lodash')
+  Random = require('random').Random
+if !_?
+  throw Error("Unable to find Lo-Dash")
+if !Random?
+  throw Error("Unable to find Random")
+
+
+# ===============================================
+#    Utilities
+# ===============================================
+
+# Create a deep copy of obj. Does not work on nested objects. Uses
+# JSON serialization to break all bindings.
+#
+# Not suitable for copying any object that contains an instance of 
+# Random, as it will break the random seeding consistency.
+copy = (obj) ->
+  duplicate = JSON.parse(JSON.stringify(obj))
+  return duplicate
 
 # ===============================================
 #    Arena
@@ -20,29 +42,42 @@ class Arena
     @verbose = argObj.verbose or false
     @positions = {}
     @history = []
+    @random = new Random(if argObj.randomSeed? then argObj.randomSeed else 1)
   setPosition: (obj) ->
     @fillRegionWithPolygon obj
-  addWalker: (opts) ->
-    opts = (if opts is `undefined` then {} else opts)
+  addWalker: (opts = {}) ->
     opts = @randomPositionWithin(opts)
+    opts.random = @random
     walker = new Walker(opts)
     @walkers.push walker
     @setPosition(walker)
   addSeeker: (opts = {}) ->
     opts = @randomPositionWithin(opts)
+    opts.random = @random
     seeker = new Seeker(opts)
     @actors.push seeker
     @setPosition(seeker)
   addPeriodicWalker: (opts) ->
     opts = @randomPositionWithin(opts)
     opts.frequency = opts.frequency or 20
-    f = ->
+    fn = ->
       self.addWalker opts
       return
-
-    f.frequency = opts.frequency
+    fn.frequency = opts.frequency
     self = this
-    @periodics.push f
+    @periodics.push fn
+
+
+  addObject: (obj) ->
+    # If object is descended from the Seeker class
+    obj.random = @random
+    if obj instanceof Seeker
+      @actors.push obj
+
+    # Default
+    else
+      @walkers.push obj
+    
   #
   #    Container is an object such as an Arena's .positions sparse
   #    matrix. 
@@ -74,21 +109,24 @@ class Arena
 
     @positions
 
-  randomPositionWithin: (opts) ->
-    opts = (if opts is `undefined` then {} else opts)
-    opts.x = Math.floor(opts.x) or Math.floor(Math.random() * @maxX)
-    opts.y = Math.floor(opts.y) or Math.floor(Math.random() * @maxY)
-    opts
+  randomPositionWithin: (opts = {}) ->
+    opts.x = Math.floor(opts.x) or @random.randint(0, @maxX)
+    opts.y = Math.floor(opts.y) or @random.randint(0, @maxY)
+    return opts
 
   pathClear: (obj, newPos) ->
+    lastX = obj.x
     for x in [obj.x..(obj.x + newPos.x)]
       @positions[x] = {} if !@positions[x]?
+      lastY = obj.y
       for y in [obj.y..(obj.y + newPos.y)]
         @positions[x][y] = [] if !@positions[x][y]?
         solid = @positions[x][y].some((i)-> return i.solid)
         if(solid)
           # Adjust the new coordinates to be in terms of change from the original position
-          return [x - obj.x, y - obj.y]
+          return [lastX - obj.x, lastY - obj.y]
+        lastY = y
+      lastX = x
     # Didn't encounter any solid objects along the path
     return [newPos.x, newPos.y]
   tick: ->
@@ -116,12 +154,13 @@ class Arena
 
     survivors = []
     @walkers.forEach (obj, i) ->
-      if deceased[obj.id] is `undefined`
+      if !deceased[obj.id]?
         survivors.push obj
       else
         obj.state = "dead"
       return
     @walkers = survivors
+
 
     survivors = []
     @actors.forEach (obj, i) ->
@@ -138,41 +177,86 @@ class Arena
 
     return
 
-
-
 # ===============================================
 #    Walker
 #    Defines an object which traverses the arena in a random walk. 
 # =============================================== 
 class Walker
+  @WALKER_COUNT: 0
   constructor: (argObj) ->
+    # Ensure that each Walker has a unique identifier
     @id = "walker-" + Walker.WALKER_COUNT
     @x = argObj.x
     @y = argObj.y
-    @size = (if argObj.size is `undefined` then 5 else argObj.size)
-    @stepSize = (if argObj.stepSize is `undefined` then 1 else argObj.stepSize)
+    @size = (if argObj.size? then argObj.size else 1)
+    @stepSize = (if argObj.stepSize? then argObj.stepSize else 1)
     @state = argObj.state
+
+    # String declaring the type of entity.
     @type = argObj.type
 
-    @edible = true
+    # This entity can be passed through
     @solid = false
     
+    # The metabolic value of consuming this
+    @value = if argObj.value? then argObj.value else 1
+
+    # Number of time steps since this entity was born
     @age = 0
+
+    # This entity has not been marked yet, so it can be interacted with
     @mark = false
+
+    # Increment count of Walker instances
     Walker.WALKER_COUNT += 1
 
-  @WALKER_COUNT: 0
+    @random = if argObj.random then argObj.random else new Random(1)
+
+    # Attach synchronous event hooks
+    @stepStartHook = if argObj.stepStart? then argObj.stepStart else []
+    @preMoveHook = if argObj.preMove? then argObj.preMove else []
+    @postMoveHook = if argObj.postMove? then argObj.postMove else []
+    @stepEndHook = if argObj.stepEndHook? then argObj.stepEndHook else []
+
+
+  # Handle Event Hooks Functions
+  stepStart: (boundsObj) ->
+    for fn in @stepStartHook
+      fn.apply(this, boundsObj)
+  preMove: (boundsObj) ->
+    for fn in @preMoveHook
+      fn.apply(this, boundsObj)
+  postMove: (boundsObj) ->
+    for fn in @postMoveHook
+      fn.apply(this, boundsObj)
+  stepEnd: (boundsObj) ->
+    for fn in @stepEndHook
+      fn.apply(this, boundsObj)
+
   step: (boundsObj) ->
-    newX = Walker.random(@stepSize)
-    newY = Walker.random(@stepSize)
+    # Increase Age
+    @age += 1
+    @stepStart(boundsObj)
+
+    @preMove(boundsObj)
+    # Compute new trajectory
+    newX = @random.randint(-@stepSize, @stepSize)
+    newY = @random.randint(-@stepSize, @stepSize)
+    # Travel as far as possible along trajectory
     [newX, newY] = boundsObj.pathClear(this, {x:newX, y:newY})
+    # Update Position
     @x += newX
     @y += newY
-    @age += 1
-    @within boundsObj
 
-  within: (boundsObj, escape) ->
-    escape = (if escape is `undefined` then true else escape)
+    # Verify Position within Bounds
+    @within boundsObj
+    @postMove(boundsObj)
+
+    @stepEnd(boundsObj)
+
+    
+
+  within: (boundsObj, escape = true) ->
     if @x <= boundsObj.minX
       @x += @stepSize * 1 + @size  if escape
     else @x -= @stepSize * 1 + @size  if escape  if @x >= boundsObj.maxX
@@ -181,18 +265,10 @@ class Walker
     else @y -= @stepSize * 1 + @size  if escape  if @y >= boundsObj.maxY
     return
 
-  # 
-  #Generate symmetric random number between @stepSize and -@stepSize
-  #
-  @random: (stepSize) ->
-    value = Math.floor(Math.random() * (stepSize * 2 + 1) - stepSize)
-    return value
-
-
 # ===============================================
 #    Seeker
 #    Defines an object which traverses the arena in tumbles and runs
-#   =============================================== 
+# =============================================== 
 FACINGS = [
   [0, 1],
   [1, 0],
@@ -208,27 +284,29 @@ class Seeker extends Walker
   @SEEKER_COUNT: 0
   constructor: (argObj) ->
     super argObj
-    #Override the Walker ID
+    # Override the Walker ID
     @id = "seeker-" + Seeker.SEEKER_COUNT
-    @edible = false
+    @canEat = if argObj.canEat? then argObj.canEat else ['food']
     @solid = true
     
-    #Movement
-    #Seekers have a facing in addition to Walker's .x and .y fields
+    # Movement
+    # Seekers have a facing in addition to Walker's .x and .y fields
     @facing = (if !argObj.facing? then [1,1] else argObj.facing)
     
-    #A pair of the form [Recent Fed, No Recent Fed]
+    # A pair of the form [Recent Fed, No Recent Fed]
     @tumbleFrequency = argObj.tumbleFrequency or [
       0.01
       0.1
     ]
     
-    #Apply Seeker's defaults in place of Walker defaults
-    @size = (if argObj.size is `undefined` then 5 else argObj.size)
-    @stepSize = (if argObj.stepSize is `undefined` then 2 else argObj.stepSize)
+    @heritableTraits = copy(argObj.heritableTraits)
+
+    # Apply Seeker's defaults in place of Walker defaults
+    @size = (if !argObj.size? then 5 else argObj.size)
+    @stepSize = (if !argObj.stepSize? then 5 else argObj.stepSize)
     @totalFood = 100
     @minimumReplicationFoodThreshold = argObj.minimumReplicationFoodThreshold or 500
-    @BMR = argObj.BMR or (metabolism = 0.01, optsObj) -> @totalFood -= metabolism
+    @BMR = argObj.BMR or (optsObj) -> @totalFood -= @stepSize/1000
     @minimumReplicationDelay = argObj.minimumReplicationDelay or 10
     @eaten = 0
     @lastEaten = [0,0,0,0]
@@ -236,39 +314,33 @@ class Seeker extends Walker
 
   step: (boundsObj) ->
     @BMR()
-    if @totalFood > @minimumReplicationFoodThreshold and @age > @minimumReplicationDelay
-      @replicate boundsObj
-      return [this]
-    else if @totalFood < 50
-      @state = "starving"
-    else
-      @state = ""
     self = this
     @eaten = 0
     tumbleProb = (if @eaten > 1 then @tumbleFrequency[0] else @tumbleFrequency[1])
-    actionChoice = Math.random()
+    actionChoice = @random.random()
     
-    #Tumble and change facing
+    # Tumble and change facing
     if actionChoice < tumbleProb
+      # Force selection of new facing
       newFacing = @facing
-      @facing = FACINGS[Math.floor(Math.random() * FACINGS.length)]  while @facing is newFacing
+      @facing = @random.choice(FACINGS) while @facing is newFacing
     
-    #Sense Beings
+    # Sense Beings
     closeThings = @sense(boundsObj)
     remove = []
-    closeThings.forEach (close) ->
-      close.forEach (o) ->
-        
-        # Need to determine if thing is close enough to eat 
-        # or adjust facing to chase
-        if o.edible and not o.mark
-          
-          #Not quite right
-          self.totalFood += o.size
-          self.eaten += 1
+    for close in closeThings
+      for o in close
+        if (o.type in @canEat) and not o.mark
+          @totalFood += o.value
+          @eaten += 1
+          o.mark = true
           remove.push o
+          if @totalFood > @minimumReplicationFoodThreshold and @age > @minimumReplicationDelay
+            @replicate boundsObj
+            remove.push(this)
+            return remove
     
-    #Compute step magnitude and apply facing direction
+    # Compute step magnitude and apply facing direction
     newX = @stepSize * @facing[0]
     newY = @stepSize * @facing[1]
 
@@ -279,15 +351,19 @@ class Seeker extends Walker
     @age += 1
     @within boundsObj
     if @totalFood < 0
+      @mark = true
       remove.push this
     
+    if @totalFood < 50
+      @state = "starving"
+    else
+      @state = ""
+
     return remove
 
-  #
-  #    As the Walker implementation, but also reverse the facing along
-  #    the impinging axis
-  #
   within: (boundsObj, escape = true) ->
+    # As the Walker implementation, but also reverse the facing along
+    # the impinging axis
     corrected = false
     if @x <= boundsObj.minX
       corrected = true
@@ -340,17 +416,43 @@ class Seeker extends Walker
     #console.log beingsSensed  if beingsSensed.length > 1
     return beingsSensed
 
-
-  #STUB
   death: (boundsObj) ->
     console.log(@id + " died");
+    @mark = true
 
-  #STUB
   replicate: (boundsObj) ->
+    @mark = true
     boundsObj.addSeeker this
     boundsObj.addSeeker this
     return
 
+# ===============================================
+#    Siderophore
+#    Defines an object descending from Walker which is not edible,
+#    but after some time delay becomes edible. 
+# =============================================== 
+
+class Siderophore extends Walker
+  constructor: (argObj) ->
+    argObj.stepStart = [] if !argObj.stepStart?
+    argObj.stepStart.push((paramObj) -> @react() if @age > 50)
+    argObj.type = 'siderophore'
+    argObj.value = 0
+    super argObj
+
+  react: ->
+    @type = 'bound-siderophore'
+    @value = 6
+
+class IronConsumer extends Seeker
+  @siderophoreCost: 3
+  constructor: (argObj) ->
+    argObj.canEat = [] if !argObj.canEat?
+    argObj.canEat.push 'bound-siderophore'
+    argObj.stepStart = [] if !argObj.stepStart?
+
+  produceSiderophore: (boundsObj) ->
+    @totalFood -= IronConsumer.siderophoreCost
 
 #
 #Export Classes for Node 
@@ -359,4 +461,4 @@ try
   exports.Walker = Walker
   exports.Seeker = Seeker
   exports.Arena = Arena
-  exports.Utils = {fillRegionWithPolygon: fillRegionWithPolygon}
+  exports.Utils = {fillRegionWithPolygon: fillRegionWithPolygon, copy: copy}

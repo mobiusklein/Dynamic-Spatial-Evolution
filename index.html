@@ -6,7 +6,8 @@
     <script src="bower_components/jquery/jquery.min.js"></script>
     <script src="bower_components/d3/d3.min.js"></script>
     <script src="bower_components/bootstrap/dist/js/bootstrap.min.js"></script>
-
+    <script src="node_modules/lodash/lodash.js"></script>
+    <script src="node_modules/random/random.js"></script>
     <!-- CSS Libraries -->
     <link rel="stylesheet" type="text/css" href="bower_components\bootswatch\cerulean\bootstrap.min.css">
     <link rel="stylesheet" type="text/css" href="bower_components\font-awesome\css\font-awesome.css">
@@ -34,6 +35,14 @@
         background: lightgrey;
     }
 
+    .enzyme{
+        fill: green !important;
+    }
+
+    .bound-enzyme{
+        fill: orange !important;
+    }
+
     .seeker{
         fill: red !important;
         stroke: darkred;
@@ -58,7 +67,7 @@
         rows.attr('class', function(d){return d.selected ? 'info' : ''})
         .on("click", clickSeekerHandler)
         var cells = rows.selectAll('td').data(function(row){
-            var vals = [{col:'ID', value: row.id}, {col:"Total Food", value: row.totalFood}, {col:'Age', value: row.age}]
+            var vals = [{col:'ID', value: row.id}, {col:"Total Food", value: row.totalFood.toPrecision(5)}, {col:'Age', value: row.age}]
             return vals
         })
         cells.enter().append('td')
@@ -67,7 +76,7 @@
     }
 
     $(function() {
-        main("#simulation-container", 0, 1, 0)
+        main("#simulation-container", 0, 5, 25)
         var running = true
         $('#toggle-running-btn').click(function() {
             var handle = $(this)
