@@ -453,6 +453,7 @@ class IronConsumer extends Seeker
 
   produceSiderophore: (boundsObj) ->
     @totalFood -= IronConsumer.siderophoreCost
+    
 
 #
 #Export Classes for Node 
