@@ -20,6 +20,9 @@ if (Random == null) {
 
 copy = function(obj) {
   var duplicate;
+  if (obj == null) {
+    return {};
+  }
   duplicate = JSON.parse(JSON.stringify(obj));
   return duplicate;
 };
@@ -84,6 +87,7 @@ Arena = (function() {
 
   Arena.prototype.addObject = function(obj) {
     obj.random = this.random;
+    this.randomPositionWithin(obj);
     if (obj instanceof Seeker) {
       return this.actors.push(obj);
     } else {
@@ -234,9 +238,9 @@ Walker = (function() {
     this.mark = false;
     Walker.WALKER_COUNT += 1;
     this.random = argObj.random ? argObj.random : new Random(1);
-    this.stepStartHook = argObj.stepStart != null ? argObj.stepStart : [];
-    this.preMoveHook = argObj.preMove != null ? argObj.preMove : [];
-    this.postMoveHook = argObj.postMove != null ? argObj.postMove : [];
+    this.stepStartHook = argObj.stepStartHook != null ? argObj.stepStartHook : [];
+    this.preMoveHook = argObj.preMoveHook != null ? argObj.preMoveHook : [];
+    this.postMoveHook = argObj.postMoveHook != null ? argObj.postMoveHook : [];
     this.stepEndHook = argObj.stepEndHook != null ? argObj.stepEndHook : [];
   }
 
@@ -246,7 +250,7 @@ Walker = (function() {
     _results = [];
     for (_i = 0, _len = _ref.length; _i < _len; _i++) {
       fn = _ref[_i];
-      _results.push(fn.apply(this, boundsObj));
+      _results.push(fn.apply(this, [boundsObj]));
     }
     return _results;
   };
@@ -257,7 +261,7 @@ Walker = (function() {
     _results = [];
     for (_i = 0, _len = _ref.length; _i < _len; _i++) {
       fn = _ref[_i];
-      _results.push(fn.apply(this, boundsObj));
+      _results.push(fn.apply(this, [boundsObj]));
     }
     return _results;
   };
@@ -268,7 +272,7 @@ Walker = (function() {
     _results = [];
     for (_i = 0, _len = _ref.length; _i < _len; _i++) {
       fn = _ref[_i];
-      _results.push(fn.apply(this, boundsObj));
+      _results.push(fn.apply(this, [boundsObj]));
     }
     return _results;
   };
@@ -279,7 +283,7 @@ Walker = (function() {
     _results = [];
     for (_i = 0, _len = _ref.length; _i < _len; _i++) {
       fn = _ref[_i];
-      _results.push(fn.apply(this, boundsObj));
+      _results.push(fn.apply(this, [boundsObj]));
     }
     return _results;
   };
@@ -358,16 +362,17 @@ Seeker = (function(_super) {
     };
     this.minimumReplicationDelay = argObj.minimumReplicationDelay || 10;
     this.eaten = 0;
-    this.lastEaten = [0, 0, 0, 0];
+    this.lastEaten = [0, 0, 0];
     Seeker.SEEKER_COUNT += 1;
   }
 
   Seeker.prototype.step = function(boundsObj) {
-    var actionChoice, close, closeThings, newFacing, newX, newY, o, remove, self, tumbleProb, _i, _j, _len, _len1, _ref, _ref1;
+    var actionChoice, close, closeThings, diffEaten, newFacing, newX, newY, o, remove, tumbleProb, _i, _j, _len, _len1, _ref, _ref1;
+    this.age += 1;
+    this.stepStart(boundsObj);
     this.BMR();
-    self = this;
-    this.eaten = 0;
-    tumbleProb = (this.eaten > 1 ? this.tumbleFrequency[0] : this.tumbleFrequency[1]);
+    diffEaten = (this.eaten - this.lastEaten[0]) > (this.lastEaten[0] - this.lastEaten[1]);
+    tumbleProb = (diffEaten ? this.tumbleFrequency[0] : this.tumbleFrequency[1]);
     actionChoice = this.random.random();
     if (actionChoice < tumbleProb) {
       newFacing = this.facing;
@@ -375,6 +380,11 @@ Seeker = (function(_super) {
         this.facing = this.random.choice(FACINGS);
       }
     }
+    this.lastEaten.unshift(this.eaten);
+    if (this.lastEaten.length > 2) {
+      this.lastEaten.pop();
+    }
+    this.eaten = 0;
     closeThings = this.sense(boundsObj);
     remove = [];
     for (_i = 0, _len = closeThings.length; _i < _len; _i++) {
@@ -396,19 +406,22 @@ Seeker = (function(_super) {
     }
     newX = this.stepSize * this.facing[0];
     newY = this.stepSize * this.facing[1];
-    _ref1 = boundsObj.pathClear(self, {
+    _ref1 = boundsObj.pathClear(this, {
       x: newX,
       y: newY
     }), newX = _ref1[0], newY = _ref1[1];
     this.x += newX;
     this.y += newY;
-    this.age += 1;
     this.within(boundsObj);
     if (this.totalFood < 0) {
       this.mark = true;
       remove.push(this);
-    }
-    if (this.totalFood < 50) {
+    } else if (this.totalFood > this.minimumReplicationFoodThreshold && this.age > this.minimumReplicationDelay) {
+      this.replicate(boundsObj);
+      this.mark = true;
+      remove.push(this);
+      return remove;
+    } else if (this.totalFood < 50) {
       this.state = "starving";
     } else {
       this.state = "";
@@ -508,23 +521,30 @@ Seeker = (function(_super) {
 Siderophore = (function(_super) {
   __extends(Siderophore, _super);
 
+  Siderophore.maturationTime = 30;
+
+  Siderophore.matureValue = 5;
+
   function Siderophore(argObj) {
-    if (argObj.stepStart == null) {
-      argObj.stepStart = [];
+    if (argObj.stepStartHook == null) {
+      argObj.stepStartHook = [];
     }
-    argObj.stepStart.push(function(paramObj) {
-      if (this.age > 50) {
+    argObj.stepStartHook.push(function(paramObj) {
+      if (this.age > Siderophore.maturationTime && !this.reacted) {
         return this.react();
       }
     });
     argObj.type = 'siderophore';
     argObj.value = 0;
+    argObj.size = 2;
     Siderophore.__super__.constructor.call(this, argObj);
+    this.reacted = false;
   }
 
   Siderophore.prototype.react = function() {
+    this.reacted = true;
     this.type = 'bound-siderophore';
-    return this.value = 6;
+    return this.value = Siderophore.matureValue;
   };
 
   return Siderophore;
@@ -534,20 +554,48 @@ Siderophore = (function(_super) {
 IronConsumer = (function(_super) {
   __extends(IronConsumer, _super);
 
-  IronConsumer.siderophoreCost = 3;
+  IronConsumer.siderophoreCost = 2;
+
+  IronConsumer.siderophoreProductionRate = 20;
+
+  IronConsumer.COUNT = 0;
 
   function IronConsumer(argObj) {
     if (argObj.canEat == null) {
       argObj.canEat = [];
     }
     argObj.canEat.push('bound-siderophore');
-    if (argObj.stepStart == null) {
-      argObj.stepStart = [];
+    argObj.type = 'iron-consumer';
+    if (argObj.stepStartHook == null) {
+      argObj.stepStartHook = [];
     }
+    argObj.stepStartHook.push((function(paramObj) {
+      if (this.age % IronConsumer.siderophoreProductionRate === 0) {
+        return this.produceSiderophore(paramObj);
+      }
+    }));
+    IronConsumer.__super__.constructor.call(this, argObj);
+    this.id = "iron-consumer-" + IronConsumer.COUNT++;
   }
 
   IronConsumer.prototype.produceSiderophore = function(boundsObj) {
-    return this.totalFood -= IronConsumer.siderophoreCost;
+    var pos, siderophore;
+    this.totalFood -= IronConsumer.siderophoreCost;
+    pos = {
+      x: this.x,
+      y: this.y
+    };
+    siderophore = new Siderophore(pos);
+    return boundsObj.addObject(siderophore);
+  };
+
+  IronConsumer.prototype.replicate = function(boundsObj) {
+    var daughterA, daughterB;
+    daughterA = new IronConsumer(this);
+    daughterB = new IronConsumer(this);
+    boundsObj.addObject(daughterA);
+    boundsObj.addObject(daughterB);
+    this.mark = true;
   };
 
   return IronConsumer;

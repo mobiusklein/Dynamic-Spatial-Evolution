@@ -48,6 +48,7 @@ function main(container, numWalkers, numSeekers, numPeriodicFood) {
     d3.range(numWalkers).map(function(i){arena.addWalker({type: "glucose", size: 1, stepSize: 10 })})
     d3.range(numPeriodicFood).map(function(i){arena.addPeriodicWalker({type: "glucose", size: 1, frequency: 100})})
     d3.range(numSeekers).map(function(i){arena.addSeeker({type: "E-coli", canEat: ["glucose"]})})
+    d3.range(numSeekers).map(function(i){arena.addObject(new IronConsumer({}))})
 
     function tick(d){
         /* Run the model forward one time step */
@@ -55,11 +56,13 @@ function main(container, numWalkers, numSeekers, numPeriodicFood) {
 
         walkerNodes = svg.selectAll(".walker").data(arena.walkers)
         walkerNodes.enter().append('circle')
-            .attr("r", function(d){ return d.size })
+            
         //Seperate creation of new nodes from node updates
         walkerNodes.attr("cx", function(d) { return d.x; })
             .attr("cy", function(d) { return d.y; })
+            .attr("r", function(d){ return d.size })
             .attr("class", function(d) { return "walker "+d.type; })
+            .attr("id", function(d) { return d.id })
         walkerNodes.exit().remove()
 
         seekerNodes = svg.selectAll(".seeker").data(arena.actors)
@@ -70,6 +73,7 @@ function main(container, numWalkers, numSeekers, numPeriodicFood) {
             .attr("cy", function(d) { return d.y; })
             .attr('id', function(d) { return d.id.split(' ').join('-')})
             .attr("class", function(d) { return "seeker " + d.state + " " + d.type + (d.selected ? ' selected' : ''); })
+            .attr("id", function(d) { return d.id })
             .on("click", clickSeekerHandler)
         seekerNodes.exit().remove()
     }/*End tick()*/

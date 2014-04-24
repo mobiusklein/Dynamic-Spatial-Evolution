@@ -14,11 +14,14 @@ if !Random?
 # ===============================================
 
 # Create a deep copy of obj. Does not work on nested objects. Uses
-# JSON serialization to break all bindings.
-#
+# JSON serialization to break all bindings. If called on `undefined`
+# returns {} instead
+# 
 # Not suitable for copying any object that contains an instance of 
 # Random, as it will break the random seeding consistency.
 copy = (obj) ->
+  if !obj?
+    return {}
   duplicate = JSON.parse(JSON.stringify(obj))
   return duplicate
 
@@ -71,9 +74,9 @@ class Arena
   addObject: (obj) ->
     # If object is descended from the Seeker class
     obj.random = @random
+    @randomPositionWithin(obj)
     if obj instanceof Seeker
       @actors.push obj
-
     # Default
     else
       @walkers.push obj
@@ -110,6 +113,8 @@ class Arena
     @positions
 
   randomPositionWithin: (opts = {}) ->
+    # Adds a random position within the arena if the object does
+    # not already have xy coordinates
     opts.x = Math.floor(opts.x) or @random.randint(0, @maxX)
     opts.y = Math.floor(opts.y) or @random.randint(0, @maxY)
     return opts
@@ -213,25 +218,25 @@ class Walker
     @random = if argObj.random then argObj.random else new Random(1)
 
     # Attach synchronous event hooks
-    @stepStartHook = if argObj.stepStart? then argObj.stepStart else []
-    @preMoveHook = if argObj.preMove? then argObj.preMove else []
-    @postMoveHook = if argObj.postMove? then argObj.postMove else []
+    @stepStartHook = if argObj.stepStartHook? then argObj.stepStartHook else []
+    @preMoveHook = if argObj.preMoveHook? then argObj.preMoveHook else []
+    @postMoveHook = if argObj.postMoveHook? then argObj.postMoveHook else []
     @stepEndHook = if argObj.stepEndHook? then argObj.stepEndHook else []
 
 
   # Handle Event Hooks Functions
   stepStart: (boundsObj) ->
     for fn in @stepStartHook
-      fn.apply(this, boundsObj)
+      fn.apply(this, [boundsObj])
   preMove: (boundsObj) ->
     for fn in @preMoveHook
-      fn.apply(this, boundsObj)
+      fn.apply(this, [boundsObj])
   postMove: (boundsObj) ->
     for fn in @postMoveHook
-      fn.apply(this, boundsObj)
+      fn.apply(this, [boundsObj])
   stepEnd: (boundsObj) ->
     for fn in @stepEndHook
-      fn.apply(this, boundsObj)
+      fn.apply(this, [boundsObj])
 
   step: (boundsObj) ->
     # Increase Age
@@ -309,22 +314,28 @@ class Seeker extends Walker
     @BMR = argObj.BMR or (optsObj) -> @totalFood -= @stepSize/1000
     @minimumReplicationDelay = argObj.minimumReplicationDelay or 10
     @eaten = 0
-    @lastEaten = [0,0,0,0]
+    @lastEaten = [0,0,0]
     Seeker.SEEKER_COUNT += 1
 
   step: (boundsObj) ->
+    # Increase Age
+    @age += 1
+    @stepStart(boundsObj)
     @BMR()
-    self = this
-    @eaten = 0
-    tumbleProb = (if @eaten > 1 then @tumbleFrequency[0] else @tumbleFrequency[1])
-    actionChoice = @random.random()
-    
+
     # Tumble and change facing
+    diffEaten = (@eaten - @lastEaten[0]) > (@lastEaten[0] - @lastEaten[1])
+    tumbleProb = (if diffEaten then @tumbleFrequency[0] else @tumbleFrequency[1])
+    actionChoice = @random.random()
     if actionChoice < tumbleProb
       # Force selection of new facing
       newFacing = @facing
       @facing = @random.choice(FACINGS) while @facing is newFacing
     
+    @lastEaten.unshift(@eaten)
+    @lastEaten.pop() if @lastEaten.length > 2
+    @eaten = 0
+
     # Sense Beings
     closeThings = @sense(boundsObj)
     remove = []
@@ -344,17 +355,20 @@ class Seeker extends Walker
     newX = @stepSize * @facing[0]
     newY = @stepSize * @facing[1]
 
-    [newX, newY] = boundsObj.pathClear(self, {x:newX, y:newY})
+    [newX, newY] = boundsObj.pathClear(this, {x:newX, y:newY})
     
     @x += newX
     @y += newY
-    @age += 1
     @within boundsObj
     if @totalFood < 0
       @mark = true
       remove.push this
-    
-    if @totalFood < 50
+    else if @totalFood > @minimumReplicationFoodThreshold and @age > @minimumReplicationDelay
+        @replicate boundsObj
+        @mark = true
+        remove.push(this)
+        return remove
+    else if @totalFood < 50
       @state = "starving"
     else
       @state = ""
@@ -433,27 +447,51 @@ class Seeker extends Walker
 # =============================================== 
 
 class Siderophore extends Walker
+  @maturationTime: 30
+  @matureValue: 5
   constructor: (argObj) ->
-    argObj.stepStart = [] if !argObj.stepStart?
-    argObj.stepStart.push((paramObj) -> @react() if @age > 50)
+    argObj.stepStartHook = [] if !argObj.stepStartHook?
+    argObj.stepStartHook.push((paramObj) -> @react() if @age > Siderophore.maturationTime and !@reacted)
     argObj.type = 'siderophore'
     argObj.value = 0
+    argObj.size = 2
     super argObj
+    @reacted = false
 
   react: ->
+    @reacted = true
     @type = 'bound-siderophore'
-    @value = 6
+    @value = Siderophore.matureValue
 
 class IronConsumer extends Seeker
-  @siderophoreCost: 3
+  @siderophoreCost: 2
+  @siderophoreProductionRate: 20
+  @COUNT = 0
   constructor: (argObj) ->
     argObj.canEat = [] if !argObj.canEat?
     argObj.canEat.push 'bound-siderophore'
-    argObj.stepStart = [] if !argObj.stepStart?
+    argObj.type = 'iron-consumer'
+    argObj.stepStartHook = [] if !argObj.stepStartHook?
+    argObj.stepStartHook.push ((paramObj) -> 
+      if @age % IronConsumer.siderophoreProductionRate == 0
+        @produceSiderophore(paramObj)
+      )
+    super argObj
+    @id = "iron-consumer-" + IronConsumer.COUNT++
 
   produceSiderophore: (boundsObj) ->
     @totalFood -= IronConsumer.siderophoreCost
-    
+    pos = {x: @x, y: @y}
+    siderophore = new Siderophore(pos)
+    boundsObj.addObject(siderophore)
+
+  replicate: (boundsObj) ->
+    daughterA = new IronConsumer(this)
+    daughterB = new IronConsumer(this)
+    boundsObj.addObject(daughterA)
+    boundsObj.addObject(daughterB)
+    @mark = true
+    return
 
 #
 #Export Classes for Node 
