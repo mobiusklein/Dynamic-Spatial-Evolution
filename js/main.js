@@ -1,12 +1,32 @@
 var arena = new Arena({minX: 0, maxX: 750, minY: 0, maxY: 500})
 
-var timeManager = {
-    timerID: null,
-    startSimulation: null,
-    pauseSimulation: null
+
+var TimeManager = function(tickInterval, fn){
+    this.timerID = null
+    this.startSimulation = null
+    this.pauseSimulation = null
+    this.tickInterval = tickInterval
+    this.fn = fn
+}
+TimeManager.prototype.startSimulation = function(){
+        this.timerID = setInterval(tick, this.tickInterval)
+} 
+TimeManager.prototype.pauseSimulation = function(){
+        clearInterval(this.timerID)
+}
+TimeManager.prototype.setSpeed = function(tickInterval){
+        tickInterval = tickInterval === undefined ? this.tickInterval : tickInterval
+        clearInterval(this.timerID)
+        this.tickInterval = tickInterval
+        this.timerID = setInterval(this.fn, this.tickInterval)    
 }
 
-TICKINTERVAL = 50
+String.prototype.sluggify = function(){
+    var parts = this.split(' ')
+    var lower = parts.map(function(x){return x.toLowerCase()})
+    var slug = lower.join('-')
+    return slug
+}
 
 function clickSeekerHandler(d, i, j){
     $('.selected').removeClass('selected')
@@ -16,9 +36,10 @@ function clickSeekerHandler(d, i, j){
 }
 
 
+
 function setSimulationClickHandler(func){
-    svg.on('click', null)
-    svg.on('click', func)
+    container.on('click', null)
+    container.on('click', func)
 }
 
 function clickAddNutrientHandler(){
@@ -29,60 +50,92 @@ function clickAddNutrientHandler(){
 }
 
 function clickGetPositionHandler(){
-    console.log(d3.mouse(this))
+    var pos = d3.mouse(this)
+    console.log(pos)
+    pos = pos.map(Math.floor)
+    console.log(pos)
+    if(arena.positions[pos[0]] === undefined) {arena.positions[pos[0]] = {}}
+    if(arena.positions[pos[0]][pos[1]] === undefined) {arena.positions[pos[0]][pos[1]] = {}}
+    console.log(arena.positions[pos[0]][pos[1]])
 }
 
 function zoomed() {
-    svg.attr("transform", "scale(" + d3.event.scale + ")");
+    container.attr("transform", "scale(" + d3.event.scale + ")");
 }
 var zoom = d3.behavior.zoom().scaleExtent([1, 10])
 
-svg = {}
+
+timeManager = {}
+container = {}
+blockadeNodes = [];
 walkerNodes = [];
 seekerNodes = [];
 
 
-function main(container, numWalkers, numSeekers, numPeriodicFood) {
-    svg = d3.select(container).append("svg").attr('width', arena.maxX).attr('height', arena.maxY)
-    svg.on('click', clickAddNutrientHandler)
-    d3.range(numWalkers).map(function(i){arena.addWalker({type: "glucose", size: 1, stepSize: 10 })})
-    d3.range(numPeriodicFood).map(function(i){arena.addPeriodicWalker({type: "glucose", size: 1, frequency: 100})})
-    d3.range(numSeekers).map(function(i){arena.addSeeker({type: "E-coli", canEat: ["glucose"]})})
-    d3.range(numSeekers).map(function(i){arena.addObject(new IronConsumer({}))})
+function main(containerDiv, numWalkers, numSeekers, numPeriodicFood) {
+    container = d3.select(containerDiv).append("svg").attr('width', arena.maxX).attr('height', arena.maxY)
+    d3.range(3).map(function(i){
+        var pos = arena.randomPositionWithin()
+        pos.height = 80
+        pos.width = 20
+        arena.addObject( new Blockade(pos) )
+    })
+    d3.range(numWalkers).map(function(i){arena.addWalker({type: "glucose", size: 1, stepSize: 10 }, true)})
+    d3.range(numPeriodicFood).map(function(i){arena.addPeriodicWalker({type: "glucose", size: 1, frequency: 30}, true)})
+    d3.range(numSeekers).map(function(i){arena.addSeeker({type: "E-coli", canEat: ["glucose", "bound-siderophore"]}, true)})
+    d3.range(numSeekers).map(function(i){arena.addObject(new SiderophoreProducer({}), true)})
 
+    setSimulationClickHandler(clickGetPositionHandler/*clickAddNutrientHandler*/)
     function tick(d){
         /* Run the model forward one time step */
         arena.tick()
 
-        walkerNodes = svg.selectAll(".walker").data(arena.walkers)
+        blockadeNodes = container.selectAll(".blockade").data(arena.blockades)
+        blockadeNodes.enter().append("rect")
+
+/*
+    SVG rectangles draw with x, y being the upper left corner. Translate the center
+    up and away 
+*/
+
+        blockadeNodes.attr("x", function(d){ return d.x - d.width})
+            .attr("y", function(d){ return d.y - d.height })
+            .attr('width', function(d){ return d.width * 2})
+            .attr('height', function(d){ return d.height * 2})
+
+        blockadeNodes.exit().remove()
+
+
+        walkerNodes = container.selectAll(".walker").data(arena.walkers)
         walkerNodes.enter().append('circle')
             
         //Seperate creation of new nodes from node updates
         walkerNodes.attr("cx", function(d) { return d.x; })
             .attr("cy", function(d) { return d.y; })
             .attr("r", function(d){ return d.size })
-            .attr("class", function(d) { return "walker "+d.type; })
+            .attr("class", function(d) { return "walker "+d.type.sluggify(); })
             .attr("id", function(d) { return d.id })
         walkerNodes.exit().remove()
 
-        seekerNodes = svg.selectAll(".seeker").data(arena.actors)
+        seekerNodes = container.selectAll(".seeker").data(arena.actors)
         seekerNodes.enter().append('circle')
             .attr("r", function(d){ return d.size})
         //Seperate creation of new nodes from node updates
         seekerNodes.attr("cx", function(d) { return d.x; })
             .attr("cy", function(d) { return d.y; })
             .attr('id', function(d) { return d.id.split(' ').join('-')})
-            .attr("class", function(d) { return "seeker " + d.state + " " + d.type + (d.selected ? ' selected' : ''); })
+            .attr("class", function(d) { return "seeker " + d.state.sluggify() + " " + d.type.sluggify() + (d.selected ? ' selected' : ''); })
             .attr("id", function(d) { return d.id })
             .on("click", clickSeekerHandler)
         seekerNodes.exit().remove()
     }/*End tick()*/
-
-    timeManager.timerID = setInterval(tick, TICKINTERVAL)
+    timeManager = new TimeManager(1, tick)
+    timeManager.setSpeed()
     timeManager.startSimulation = function(){
-        this.timerID = setInterval(tick, TICKINTERVAL)
+        this.timerID = setInterval(tick, this.tickInterval)
     } 
     timeManager.pauseSimulation = function(){
         clearInterval(this.timerID)
     }
+
 }
