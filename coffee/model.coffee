@@ -36,32 +36,39 @@ class Arena
     @maxX = argObj.maxX
     @minY = argObj.minY
     @maxY = argObj.maxY
+    
     @ticker = 0
+    
     @creationQueue = []
+
     @actors = []
     @walkers = []
+    @blockades = []
     @periodics = []
+
     @save = argObj.save or false
     @verbose = argObj.verbose or false
+    
     @positions = {}
     @history = []
+    
     @random = new Random(if argObj.randomSeed? then argObj.randomSeed else 1)
   setPosition: (obj) ->
-    @fillRegionWithPolygon obj
+    obj.fillRegion(this)
   addWalker: (opts = {}) ->
     opts = @randomPositionWithin(opts)
     opts.random = @random
     walker = new Walker(opts)
     @walkers.push walker
     @setPosition(walker)
-  addSeeker: (opts = {}) ->
-    opts = @randomPositionWithin(opts)
+  addSeeker: (opts = {}, force = false) ->
+    opts = @randomPositionWithin(opts, force)
     opts.random = @random
     seeker = new Seeker(opts)
     @actors.push seeker
     @setPosition(seeker)
-  addPeriodicWalker: (opts) ->
-    opts = @randomPositionWithin(opts)
+  addPeriodicWalker: (opts, force = false) ->
+    opts = @randomPositionWithin(opts, force)
     opts.frequency = opts.frequency or 20
     fn = ->
       self.addWalker opts
@@ -71,52 +78,35 @@ class Arena
     @periodics.push fn
 
 
-  addObject: (obj) ->
+  addObject: (obj, force = false) ->
     # If object is descended from the Seeker class
     obj.random = @random
-    @randomPositionWithin(obj)
+    @randomPositionWithin(obj, force)
     if obj instanceof Seeker
       @actors.push obj
-    # Default
-    else
-      @walkers.push obj
     
-  #
-  #    Container is an object such as an Arena's .positions sparse
-  #    matrix. 
-  #
-  fillRegionWithPolygon: (polygonObj) ->
-    #
-    #    SIZE positions on either side of the origin point  
-    #
-    minX = polygonObj.x - polygonObj.size
-    minY = polygonObj.y - polygonObj.size
-    minX = if minX >= 0 then minX else 0
-    minY = if minY >= 0 then minY else 0
+    else if obj instanceof Walker
+      @walkers.push obj
 
-    maxX = polygonObj.x + polygonObj.size
-    maxY = polygonObj.y + polygonObj.size
+    else if obj instanceof Blockade
+      @blockades.push obj
 
-    maxX = if maxX > @maxX then @maxX else maxX
-    maxY = if maxY > @maxY then @maxY else maxY
-
-    xAxisRange = (x for x in [minX..maxX])
-    yAxisRange = (y for y in [minY..maxY])
-
-    # Fill space around the position of the polygonObj
-    for x in xAxisRange
-      for y in yAxisRange
-        @positions[x] = {} if !@positions[x]?
-        @positions[x][y] = []  if !@positions[x][y]?
-        @positions[x][y].push polygonObj
-
-    @positions
-
-  randomPositionWithin: (opts = {}) ->
+    else 
+      throw Error("Could not infer arena slot for #{obj}")
+    
+  randomPositionWithin: (opts = {}, force = false) ->
     # Adds a random position within the arena if the object does
     # not already have xy coordinates
-    opts.x = Math.floor(opts.x) or @random.randint(0, @maxX)
-    opts.y = Math.floor(opts.y) or @random.randint(0, @maxY)
+    opts.x = @random.randint(0, @maxX) if(force or !opts.x?)
+    opts.y = @random.randint(0, @maxY) if(force or !opts.y?)
+    opts.x = Math.floor(opts.x)
+    opts.y = Math.floor(opts.y)
+
+    # Make sure you're not located in a Blockade
+    if @positions[opts.x]? and @positions[opts.x][opts.y]? and 
+       @positions[opts.x][opts.y].some((entity) -> return entity instanceof Blockade)
+      opts = @randomPositionWithin(opts, true)
+
     return opts
 
   pathClear: (obj, newPos) ->
@@ -141,21 +131,21 @@ class Arena
     deceased = {}
     self = this
 
-    @walkers.forEach (obj, i) ->
-      obj.step self
-      self.setPosition obj
-      return
+    for block in @blockades
+      @setPosition(block)
+
+    for walker in @walkers
+
+      walker.step(this)
+      @setPosition(walker)
 
     dead = []
 
-    @actors.forEach (obj, i) ->
-      dead = (obj.step(self))
-      dead.forEach (o) ->
-        deceased[o.id] = true
-        return
-
-      self.setPosition obj
-      return
+    for actor in @actors
+      dead = actor.step(this)
+      for died in dead
+        deceased[died.id] = true
+      @setPosition(actor)
 
     survivors = []
     @walkers.forEach (obj, i) ->
@@ -168,12 +158,9 @@ class Arena
 
 
     survivors = []
-    @actors.forEach (obj, i) ->
-      if deceased[obj.id] is `undefined`
-        survivors.push obj
-      else
-        obj.state = "dead"
-      return
+    for actor in @actors
+      if !deceased[actor.id]?
+        survivors.push actor
     @actors = survivors
 
     @periodics.forEach (func, i) ->
@@ -181,6 +168,48 @@ class Arena
       return
 
     return
+
+# ===============================================
+#    Blockade
+#    Defines an object which prevents movement through it
+# =============================================== 
+
+class Blockade
+  @COUNT: 0
+  constructor: (argObj) ->
+    @id = "blockade-" + Blockade.COUNT
+    
+    @x = argObj.x
+    @y = argObj.y
+    
+    @width = argObj.width
+    @height = argObj.height
+    
+    @solid = true
+
+    @state = ""
+
+  fillRegion: (boundsObj) ->
+    minX = @x - @width
+    minY = @y - @height
+    minX = if minX >= 0 then minX else 0
+    minY = if minY >= 0 then minY else 0
+
+    maxX = @x + @width
+    maxY = @y + @height
+
+    maxX = if maxX > @maxX then @maxX else maxX
+    maxY = if maxY > @maxY then @maxY else maxY
+
+    xAxisRange = (x for x in [minX..maxX])
+    yAxisRange = (y for y in [minY..maxY])
+
+    # Fill space around the position of this object
+    for x in xAxisRange
+      for y in yAxisRange
+        boundsObj.positions[x] = {} if !boundsObj.positions[x]?
+        boundsObj.positions[x][y] = []  if !boundsObj.positions[x][y]?
+        boundsObj.positions[x][y].push this
 
 # ===============================================
 #    Walker
@@ -259,8 +288,6 @@ class Walker
 
     @stepEnd(boundsObj)
 
-    
-
   within: (boundsObj, escape = true) ->
     if @x <= boundsObj.minX
       @x += @stepSize * 1 + @size  if escape
@@ -269,6 +296,28 @@ class Walker
       @y += @stepSize * 1 + @size  if escape
     else @y -= @stepSize * 1 + @size  if escape  if @y >= boundsObj.maxY
     return
+
+  fillRegion: (boundsObj) ->
+    minX = @x - @size
+    minY = @y - @size
+    minX = if minX >= 0 then minX else 0
+    minY = if minY >= 0 then minY else 0
+
+    maxX = @x + @size
+    maxY = @y + @size
+
+    maxX = if maxX > @maxX then @maxX else maxX
+    maxY = if maxY > @maxY then @maxY else maxY
+
+    xAxisRange = (x for x in [minX..maxX])
+    yAxisRange = (y for y in [minY..maxY])
+
+    # Fill space around the position of this object
+    for x in xAxisRange
+      for y in yAxisRange
+        boundsObj.positions[x] = {} if !boundsObj.positions[x]?
+        boundsObj.positions[x][y] = []  if !boundsObj.positions[x][y]?
+        boundsObj.positions[x][y].push this
 
 # ===============================================
 #    Seeker
@@ -360,6 +409,7 @@ class Seeker extends Walker
     @x += newX
     @y += newY
     @within boundsObj
+
     if @totalFood < 0
       @mark = true
       remove.push this
@@ -448,7 +498,7 @@ class Seeker extends Walker
 
 class Siderophore extends Walker
   @maturationTime: 30
-  @matureValue: 5
+  @matureValue: 6
   constructor: (argObj) ->
     argObj.stepStartHook = [] if !argObj.stepStartHook?
     argObj.stepStartHook.push((paramObj) -> @react() if @age > Siderophore.maturationTime and !@reacted)
@@ -463,31 +513,32 @@ class Siderophore extends Walker
     @type = 'bound-siderophore'
     @value = Siderophore.matureValue
 
-class IronConsumer extends Seeker
-  @siderophoreCost: 2
-  @siderophoreProductionRate: 20
+class SiderophoreProducer extends Seeker
+  @siderophoreCost: 3
+  @siderophoreProductionRate: 30
   @COUNT = 0
   constructor: (argObj) ->
     argObj.canEat = [] if !argObj.canEat?
     argObj.canEat.push 'bound-siderophore'
-    argObj.type = 'iron-consumer'
+    argObj.canEat.push 'glucose'
+    argObj.type = 'siderophore-producer'
     argObj.stepStartHook = [] if !argObj.stepStartHook?
     argObj.stepStartHook.push ((paramObj) -> 
-      if @age % IronConsumer.siderophoreProductionRate == 0
+      if @age % SiderophoreProducer.siderophoreProductionRate == 0
         @produceSiderophore(paramObj)
       )
     super argObj
-    @id = "iron-consumer-" + IronConsumer.COUNT++
+    @id = "siderophore-producer-" + SiderophoreProducer.COUNT++
 
   produceSiderophore: (boundsObj) ->
-    @totalFood -= IronConsumer.siderophoreCost
+    @totalFood -= SiderophoreProducer.siderophoreCost
     pos = {x: @x, y: @y}
     siderophore = new Siderophore(pos)
     boundsObj.addObject(siderophore)
 
   replicate: (boundsObj) ->
-    daughterA = new IronConsumer(this)
-    daughterB = new IronConsumer(this)
+    daughterA = new SiderophoreProducer(this)
+    daughterB = new SiderophoreProducer(this)
     boundsObj.addObject(daughterA)
     boundsObj.addObject(daughterB)
     @mark = true

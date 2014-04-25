@@ -35,12 +35,20 @@
         background: lightgrey;
     }
 
+    rect {
+        fill: rgb(32,0,0);
+        rx: 10;
+        ry: 10;
+    }
+
     .siderophore{
         fill: green !important;
+        stroke: green;
     }
 
     .bound-siderophore{
         fill: orange !important;
+        stroke: black;
     }
 
     .seeker{
@@ -48,7 +56,7 @@
         stroke: darkred;
     }
 
-    .seeker.iron-consumer{
+    .seeker.siderophore-producer{
         fill: grey !important;
         stroke: black !important;
     }
@@ -81,7 +89,7 @@
     }
 
     $(function() {
-        main("#simulation-container", 0, 5, 25)
+        main("#simulation-container", 0, 5, 20)
         var running = true
         $('#toggle-running-btn').click(function() {
             var handle = $(this)
@@ -97,7 +105,6 @@
         })
         updateStatusTable()
         setInterval(updateStatusTable, 1000)
-        //$('#toggle-running-btn').click()
     })
     </script>
 </head>
