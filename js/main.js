@@ -289,7 +289,8 @@ function highcharts_scatter() {
                                 groups = _.groupBy(arena.actors, "type")
 
                                 a = groups['e-coli'] === undefined? 0 : groups['e-coli'].length
-                                b = groups['siderophore-producer'] === undefined? 0 : groups['siderophore-producer'].length                                for(i=0;i<a;i++){
+                                b = groups['siderophore-producer'] === undefined? 0 : groups['siderophore-producer'].length
+                                for(i=0;i<a;i++){
                                     y.push(1)
                                 }
                                 for(i=0;i<b;i++){
