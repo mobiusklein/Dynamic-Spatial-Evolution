@@ -150,5 +150,195 @@ function main(containerDiv, numWalkers, numSeekers, numPeriodicFood) {
     timeManager.pauseSimulation = function(){
         clearInterval(this.timerID)
     }
+    splineChart = populationSpline()
+    highcharts_scatter()
+}
+
+
+function populationSpline() {
+        Highcharts.setOptions({
+            global: {
+                useUTC: false
+            }
+        });
+    
+        var chartContainer = $('#plot-spline').highcharts({
+            chart: {
+                type: 'spline',
+                animation: Highcharts.svg, // don't animate in old IE
+                marginRight: 10,
+            exporting: {
+                enabled: true
+            },
+            events: {
+                    load: function () {
+    
+                        // set up the updating of the chart each second
+                        var series = this.series[0];
+                        var series2 = this.series[1]
+                        var Food = this.series[2]
+
+                        setInterval(function() {
+                            var chart = $(chartContainer).highcharts()
+                            var x = arena.ticker, // current time
+                                y = []
+                                z = []
+                                fud = arena.walkers.length
+                                groups = _.groupBy(arena.actors, "type")
+                                
+
+                                a = groups['e-coli'].length
+                                b = groups['siderophore-producer'].length
+                                for(i=0;i<a;i++){
+                                    y.push(1)
+                                }
+                                for(i=0;i<b;i++){
+                                    z.push(1)
+                                }
+
+                            series.addPoint([x, y.length]),
+                            series2.addPoint([x, z.length]),
+                            Food.addPoint([x,fud/50]);
+
+                        }, 1000);
+                    }
+                }
+            },
+            title: {
+                text: 'Live Population data'
+            },
+            xAxis: {
+                title: {
+                    text: 'Arena Age (Ticks)'
+                }
+
+            },
+            yAxis: {
+                title: {
+                    text: 'Population'
+                },
+                plotLines: [{
+                    value: 0,
+                    width: 1,
+                    color: '#808080'
+                }]
+            },
+            tooltip: {
+
+            },
+            legend: {
+                enabled: true
+            },
+            exporting: {
+                enabled: false
+            },
+            series: [{
+                name: 'Consumer',
+                data: [],
+                color: 'red',
+                marker: {
+                    enabled: false
+                }
+                },
+                {
+                name: 'Producer',
+                data: [],
+                color: 'blue',
+                marker: {
+                    enabled: false
+                }
+                },
+                {
+                    name: 'Food',
+                    data: [],
+                    color: 'black',
+                marker: {
+                    enabled: false
+                }
+                }
+
+            ]
+        });
+    return chartContainer
+}
+
+function highcharts_scatter() {
+        Highcharts.setOptions({
+            global: {
+                useUTC: false
+            }
+        });
+    
+        var chart;
+        $('#plot-scatter').highcharts({
+            chart: {
+                type: 'scatter',
+                animation: Highcharts.svg, // don't animate in old IE
+                marginRight: 10,
+                events: {
+                    load: function() {
+    
+                        // set up the updating of the chart each second
+                        var series = this.series[0];
+
+                        setInterval(function() {
+                            var x = arena.ticker, // current time
+                                y = []
+                                z = []
+                                fud = arena.walkers.length
+                                groups = _.groupBy(arena.actors, "type")
+
+                                a = groups['e-coli'].length
+                                b = groups['siderophore-producer'].length
+                                for(i=0;i<a;i++){
+                                    y.push(1)
+                                }
+                                for(i=0;i<b;i++){
+                                    z.push(1)
+                                }
+
+                            series.addPoint([b, a]);
+
+                        }, 1000);
+                    }
+                }
+            },
+            title: {
+                text: 'Ratio of Species'
+            },
+            xAxis: {
+                title: {
+                    text: 'Consumers'
+                }
+
+            },
+            yAxis: {
+                title: {
+                    text: 'Producers'
+                },
+                plotLines: [{
+                    value: 0,
+                    width: 1,
+                    color: '#808080'
+                }]
+            },
+
+            legend: {
+                enabled: true
+            },
+            exporting: {
+                enabled: false
+            },
+            series: [{
+                name: 'Population Ratio',
+                data: [],
+                color: 'red',
+                marker: {
+                    enabled: true
+                }
+                },
+
+            ]
+        });
 
 }

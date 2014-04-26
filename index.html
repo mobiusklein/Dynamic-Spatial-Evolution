@@ -10,6 +10,9 @@
     <script src="node_modules/random/random.js"></script>
     <script src="node_modules/simple-statistics/src/simple_statistics.js"></script>
     <script type="text/javascript"> ss.mixin() </script>
+    
+    <script src="http://code.highcharts.com/highcharts.js"></script>
+    <script src="http://code.highcharts.com/modules/exporting.js"></script>
     <!-- CSS Libraries -->
     <link rel="stylesheet" type="text/css" href="bower_components\bootswatch\cerulean\bootstrap.min.css">
     <link rel="stylesheet" type="text/css" href="bower_components\font-awesome\css\font-awesome.css">
@@ -37,7 +40,7 @@
         background: lightgrey;
     }
 
-    rect {
+    rect.blockade {
         fill: rgb(32,0,0);
         rx: 10;
         ry: 10;
@@ -149,8 +152,11 @@
         </div>
     </div>
     <div class='row'>
-        <div class='col-md-6'>
-            Metabolite diffusion visualized as a random walk in two dimensions.
+        <div id='plot-spline' class='col-md-6'>
+            
+        </div>
+        <div id='plot-scatter' class='col-md-6'>
+            
         </div>
     </div>
 </body>
