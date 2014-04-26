@@ -187,8 +187,8 @@ function populationSpline() {
                                 groups = _.groupBy(arena.actors, "type")
                                 
 
-                                a = groups['e-coli'].length
-                                b = groups['siderophore-producer'].length
+                                a = groups['e-coli'] === undefined? 0 : groups['e-coli'].length
+                                b = groups['siderophore-producer'] === undefined? 0 : groups['siderophore-producer'].length
                                 for(i=0;i<a;i++){
                                     y.push(1)
                                 }
@@ -288,9 +288,8 @@ function highcharts_scatter() {
                                 fud = arena.walkers.length
                                 groups = _.groupBy(arena.actors, "type")
 
-                                a = groups['e-coli'].length
-                                b = groups['siderophore-producer'].length
-                                for(i=0;i<a;i++){
+                                a = groups['e-coli'] === undefined? 0 : groups['e-coli'].length
+                                b = groups['siderophore-producer'] === undefined? 0 : groups['siderophore-producer'].length                                for(i=0;i<a;i++){
                                     y.push(1)
                                 }
                                 for(i=0;i<b;i++){
