@@ -90,8 +90,8 @@ function main(containerDiv, numWalkers, numSeekers, numPeriodicFood) {
     d3.range(numSeekers).map(function(i){arena.addSeeker({type: "e-coli", canEat: ["glucose", "bound-siderophore"]}, true)})
     d3.range(numSeekers).map(function(i){arena.addObject(new SiderophoreProducer({}), true)})
 
-    setSimulationClickHandler(clickGetPositionHandler
-                              /*clickAddNutrientHandler*/)
+    setSimulationClickHandler(/*clickGetPositionHandler*/
+                              clickAddNutrientHandler)
     function tick(d){
         /* Run the model forward one time step */
         arena.tick()

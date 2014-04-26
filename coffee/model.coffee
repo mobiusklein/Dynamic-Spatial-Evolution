@@ -8,10 +8,13 @@ if !_?
 if !Random?
   throw Error("Unable to find Random")
 
+# ===============================================
+#    Global Application Functions
+# ===============================================
+
 EntityClassRegistery = {}
 
-mutationRate = 0.2
-mutate = (heritableTraits, random) ->
+mutate = (heritableTraits, random, mutationRate = 0.2) ->
   heritableTraits = _.cloneDeep(heritableTraits)
   didMutate = false
   for traitName of heritableTraits  
@@ -20,13 +23,11 @@ mutate = (heritableTraits, random) ->
     probMutate = random.random()
     if probMutate <= mutationRate
       trait = heritableTraits[traitName]
-      #console.log "Mutation: #{probMutate}"
       
-      mod = random.gauss(trait.randMean)
-      #console.log "Modifier: #{mod}"
-      
-      trait.currentValue += mod
+      console.log trait.currentValue
+      trait.mutateFunction(trait, random)
       trait.currentValue = trait.cleanFunction(trait.currentValue)
+      console.log trait.currentValue
 
       trait.currentValue = trait.minValue if trait.currentValue < trait.minValue
       trait.currentValue = trait.maxValue if trait.currentValue > trait.maxValue
@@ -36,6 +37,10 @@ mutate = (heritableTraits, random) ->
 #    heritableTraits.strain = "strain-#{++strainCount}"
   return heritableTraits
 
+extendHeritable = (classType, newTraits) ->
+  traitsCopy = _.cloneDeep(classType.heritableTraits)
+  traitsCopy = _.extend(traitsCopy, _.cloneDeep(newTraits))
+  return traitsCopy
 
 # ===============================================
 #    Utilities
@@ -363,12 +368,12 @@ EntityClassRegistery["Walker"] = Walker
 FACINGS = [
   [0, 1],
   [1, 0],
-  [0,-1],
-  [-1,0],
-  [1,1],
-  [1,-1],
-  [-1,1],
-  [-1,-1]
+  [0, -1],
+  [-1, 0],
+  [1, 1],
+  [1, -1],
+  [-1, 1],
+  [-1, -1]
 ]
 
 class Seeker extends Walker
@@ -379,7 +384,15 @@ class Seeker extends Walker
       currentValue: 5,
       minValue: 1,
       maxValue: 100,
+      gaussMean: -0.8,
+      gaussVariance: 3,
+      mutateFunction: (trait, random) ->
+        mod = random.gauss(trait.gaussMean, trait.gaussVariance)
+        trait.currentValue += mod
       cleanFunction: Math.round,
+    }
+    genome: {
+      
     }
   }
   constructor: (argObj) ->
@@ -549,6 +562,7 @@ class Seeker extends Walker
   inherit: () ->
     for traitName of @heritableTraits
       this[traitName] = @heritableTraits[traitName].currentValue
+
 EntityClassRegistery["Seeker"] = Seeker
 # ===============================================
 #    Siderophore
@@ -579,22 +593,19 @@ class SiderophoreProducer extends Seeker
   @siderophoreCost: 3
   @siderophoreProductionRate: 30
   @COUNT: 0
-  @heritableTraits: {
-    stepSize: {
-      baseValue: 5,
-      currentValue: 5,
-      minValue: 1,
-      maxValue: 100,
-      cleanFunction: Math.round,
-    },
+  @heritableTraits: extendHeritable(Seeker,{
     siderophoreProductionRate: {
       baseValue: 30,
       currentValue: 30,
       minValue: 1,
       maxValue: 100,
+      gaussMean: -0.8
+      mutateFunction: (trait, random) ->
+        mod = random.gauss(trait.gaussMean, 1) * trait.baseValue
+        trait.currentValue += mod
       cleanFunction: Math.round,
     }
-  }
+  })
   constructor: (argObj) ->
     argObj.canEat = [] if !argObj.canEat?
     argObj.canEat.push 'bound-siderophore'
