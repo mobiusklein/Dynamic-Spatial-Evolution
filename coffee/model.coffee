@@ -12,7 +12,7 @@ EntityClassRegistery = {}
 
 mutationRate = 0.2
 mutate = (heritableTraits, random) ->
-  heritableTraits = copy(heritableTraits)
+  heritableTraits = _.cloneDeep(heritableTraits)
   didMutate = false
   for traitName of heritableTraits  
     if /strain/.test(traitName)
@@ -40,21 +40,6 @@ mutate = (heritableTraits, random) ->
 # ===============================================
 #    Utilities
 # ===============================================
-
-# Create a deep copy of obj. Does not work on nested objects. Uses
-# JSON serialization to break all bindings. If called on `undefined`
-# returns {} instead
-# 
-# Not suitable for copying any object that contains an instance of 
-# Random, as it will break the random seeding consistency.
-copy = (obj) ->
-  if !obj? or ("object" != typeof obj)
-    return obj
-  clone = obj.constructor({})
-  for attr of obj
-    if (obj.hasOwnProperty(attr))
-      clone[attr] = copy(obj[attr])
-  return clone
 
 cleanArray = (array) ->
   cleaned = []
@@ -314,6 +299,9 @@ class Walker
       boundsObj.randomPositionWithin(this, true)
 
 
+  onEaten: (eater) ->
+    eater.totalFood += @value
+
   step: (boundsObj) ->
     # Increase Age
     @age += 1
@@ -411,13 +399,13 @@ class Seeker extends Walker
       0.1
     ]
     
-    @heritableTraits = if !argObj.heritableTraits? then copy(Seeker.heritableTraits) else argObj.heritableTraits
+    @heritableTraits = if !argObj.heritableTraits? then _.cloneDeep(Seeker.heritableTraits) else argObj.heritableTraits
 
     # Apply Seeker's defaults in place of Walker defaults
     @size = (if !argObj.size? then 5 else argObj.size)
     @stepSize = (if !argObj.stepSize? then 5 else argObj.stepSize)
-    @totalFood = 100
-    @minimumReplicationFoodThreshold = argObj.minimumReplicationFoodThreshold or 350
+    @totalFood = argObj.startingFood or 75
+    @minimumReplicationFoodThreshold = argObj.minimumReplicationFoodThreshold or 300
     @BMR = argObj.BMR or (optsObj) -> @totalFood -= @stepSize/1000
     @minimumReplicationDelay = argObj.minimumReplicationDelay or 10
     @eaten = 0
@@ -451,7 +439,7 @@ class Seeker extends Walker
     for close in closeThings
       for o in close
         if (o.type in @canEat) and not o.mark
-          @totalFood += o.value
+          o.onEaten(this)
           @eaten += 1
           o.mark = true
           remove.push o
@@ -579,6 +567,7 @@ class Siderophore extends Walker
     argObj.size = 2
     super argObj
     @reacted = false
+    @spawnedBy =argObj.spawnedBy
 
   react: ->
     @reacted = true
@@ -611,7 +600,7 @@ class SiderophoreProducer extends Seeker
     argObj.canEat.push 'bound-siderophore'
     argObj.canEat.push 'glucose'
     argObj.type = 'siderophore-producer'
-    argObj.heritableTraits = if !argObj.heritableTraits? then copy(SiderophoreProducer.heritableTraits) else argObj.heritableTraits
+    argObj.heritableTraits = if !argObj.heritableTraits? then _.cloneDeep(SiderophoreProducer.heritableTraits) else argObj.heritableTraits
     argObj.stepStartHook = [] if !argObj.stepStartHook?
     argObj.stepStartHook.push ((paramObj) => 
       if @age % @siderophoreProductionRate == 0
@@ -624,7 +613,7 @@ class SiderophoreProducer extends Seeker
 
   produceSiderophore: (boundsObj) ->
     @totalFood -= SiderophoreProducer.siderophoreCost
-    pos = {x: @x, y: @y}
+    pos = {x: @x, y: @y, spawnedBy: @id}
     siderophore = new Siderophore(pos)
     boundsObj.addObject(siderophore)
 
@@ -646,4 +635,4 @@ try
   exports.Walker = Walker
   exports.Seeker = Seeker
   exports.Arena = Arena
-  exports.Utils = {fillRegionWithPolygon: fillRegionWithPolygon, copy: copy}
+  exports.Utils = {}
