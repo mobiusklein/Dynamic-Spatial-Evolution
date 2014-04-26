@@ -882,7 +882,7 @@ SiderophoreProducer = (function(_super) {
     siderophoreProductionRate: {
       baseValue: 30,
       currentValue: 30,
-      minValue: 1,
+      minValue: 10,
       maxValue: 100,
       gaussMean: -0.8,
       mutateFunction: function(trait, random) {
@@ -911,7 +911,7 @@ SiderophoreProducer = (function(_super) {
     }
     argObj.stepStartHook['produceSiderophore'] = ((function(_this) {
       return function(paramObj) {
-        if (_this.age % _this.siderophoreProductionRate === 0) {
+        if (_this.age % _this.siderophoreProductionRate === 0 && _this.totalFood > 50) {
           return _this.produceSiderophore(paramObj);
         }
       };

@@ -86,6 +86,11 @@ function main(containerDiv, numWalkers, numSeekers, numPeriodicFood) {
         arena.addObject( new Blockade(pos) )
     })*/
     
+    pos1 = {x: 375, y:50, height:150, width:20}
+    arena.addObject( new Blockade(pos1) )
+    pos2 = {x: 375,  y:450, height:150, width:20}
+    arena.addObject( new Blockade(pos2) )
+
     d3.range(numWalkers).map(function(i){arena.addWalker({type: "glucose", size: 1, stepSize: 10 }, true)})
     d3.range(numPeriodicFood).map(function(i){arena.addPeriodicWalker({type: "glucose", size: 1, frequency: 30}, true)})
     d3.range(numSeekers).map(function(i){arena.addSeeker({type: "e-coli", canEat: ["glucose", "bound-siderophore"]}, true)})

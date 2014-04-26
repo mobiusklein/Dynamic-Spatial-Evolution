@@ -664,7 +664,7 @@ class SiderophoreProducer extends Seeker
     siderophoreProductionRate: {
       baseValue: 30,
       currentValue: 30,
-      minValue: 1,
+      minValue: 10,
       maxValue: 100,
       gaussMean: -0.8
       mutateFunction: (trait, random) ->
@@ -681,7 +681,7 @@ class SiderophoreProducer extends Seeker
     argObj.heritableTraits = if !argObj.heritableTraits? then _.cloneDeep(SiderophoreProducer.heritableTraits) else argObj.heritableTraits
     argObj.stepStartHook = {} if !argObj.stepStartHook?
     argObj.stepStartHook['produceSiderophore'] = ((paramObj) => 
-      if @age % @siderophoreProductionRate == 0
+      if @age % @siderophoreProductionRate == 0 and @totalFood > 50
         @produceSiderophore(paramObj)
       )
     super argObj    
