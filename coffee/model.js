@@ -923,13 +923,11 @@ SiderophoreProducer = (function(_super) {
     if (argObj.stepStartHook == null) {
       argObj.stepStartHook = {};
     }
-    argObj.stepStartHook['produceSiderophore'] = ((function(_this) {
-      return function(paramObj) {
-        if (_this.age % _this.siderophoreProductionRate === 0 && _this.totalFood > 50) {
-          return _this.produceSiderophore(paramObj);
-        }
-      };
-    })(this));
+    argObj.stepStartHook['produceSiderophore'] = (function(paramObj) {
+      if ((this.age % this.siderophoreProductionRate === 0) && (this.totalFood > 50)) {
+        return this.produceSiderophore(paramObj);
+      }
+    });
     SiderophoreProducer.__super__.constructor.call(this, argObj);
     this.id = "siderophore-producer-" + SiderophoreProducer.COUNT++;
   }
@@ -968,5 +966,3 @@ try {
   exports.Arena = Arena;
   exports.Utils = {};
 } catch (_error) {}
-
-//# sourceMappingURL=model.map

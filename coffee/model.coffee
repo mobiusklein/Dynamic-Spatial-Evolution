@@ -690,8 +690,8 @@ class SiderophoreProducer extends Seeker
     argObj.type = 'siderophore-producer'
     argObj.heritableTraits = if !argObj.heritableTraits? then _.cloneDeep(SiderophoreProducer.heritableTraits) else argObj.heritableTraits
     argObj.stepStartHook = {} if !argObj.stepStartHook?
-    argObj.stepStartHook['produceSiderophore'] = ((paramObj) => 
-      if @age % @siderophoreProductionRate == 0 and @totalFood > 50
+    argObj.stepStartHook['produceSiderophore'] = ((paramObj) -> 
+      if (@age % @siderophoreProductionRate == 0) and (@totalFood > 50)
         @produceSiderophore(paramObj)
       )
     super argObj    
