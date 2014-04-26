@@ -18,6 +18,8 @@ if !ss?
 
 EntityClassRegistery = {}
 
+strainTree = {'strain-0':[]}
+
 mutate = (heritableTraits, random, mutationRate = 0.2) ->
   heritableTraits = _.cloneDeep(heritableTraits)
   didMutate = false
@@ -37,9 +39,12 @@ mutate = (heritableTraits, random, mutationRate = 0.2) ->
       trait.currentValue = trait.minValue if trait.currentValue < trait.minValue
       trait.currentValue = trait.maxValue if trait.currentValue > trait.maxValue
 
-      didMutate = true
-#  if didMutate
-#    heritableTraits.strain = "strain-#{++strainCount}"
+      didMutate = true if traitName != "genome"
+  if didMutate
+    parentStrain = heritableTraits.strain.currentValue
+    heritableTraits.strain.currentValue = _.uniqueId("strain-")
+    strainTree[parentStrain].push heritableTraits.strain.currentValue
+    strainTree[heritableTraits.strain.currentValue] = []
   return heritableTraits
 
 extendHeritable = (classType, newTraits) ->
@@ -460,6 +465,9 @@ class Seeker extends Walker
         for i in mutatedIndices
           trait.currentValue[i] = not trait.currentValue[i]
       cleanFunction: (g) -> return g
+    }
+    strain:{
+      currentValue: "strain-0"
     }
   }
   constructor: (argObj) ->
