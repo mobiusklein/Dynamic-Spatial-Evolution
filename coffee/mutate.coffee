@@ -3,10 +3,6 @@ if modules?
 
 rng = new Random()
 
-
-becomeSkyNet = false
-Object.freeze becomeSkyNet
-
 mutationRate = 0.2
 strainCount = 1
 heritableTraits = {}
