@@ -71,7 +71,7 @@ walkerNodes = [];
 seekerNodes = [];
 
 
-function main(containerDiv, numWalkers, numSeekers, numPeriodicFood) {
+function main(containerDiv, numWalkers, numConsumers, numProducers , numPeriodicFood) {
     container = d3.select(containerDiv).append("svg").attr('width', arena.maxX).attr('height', arena.maxY)
     /*d3.range(3).map(function(i){
         var pos = arena.randomPositionWithin()
@@ -93,8 +93,8 @@ function main(containerDiv, numWalkers, numSeekers, numPeriodicFood) {
 
     d3.range(numWalkers).map(function(i){arena.addWalker({type: "glucose", size: 1, stepSize: 10 }, true)})
     d3.range(numPeriodicFood).map(function(i){arena.addPeriodicWalker({type: "glucose", size: 1, frequency: 30}, true)})
-    d3.range(numSeekers).map(function(i){arena.addSeeker({type: "e-coli", canEat: ["glucose", "bound-siderophore"]}, true)})
-    d3.range(numSeekers).map(function(i){arena.addObject(new SiderophoreProducer({}), true)})
+    d3.range(numConsumers).map(function(i){arena.addSeeker({type: "e-coli", canEat: ["glucose", "bound-siderophore"]}, true)})
+    d3.range(numProducers).map(function(i){arena.addObject(new SiderophoreProducer({}), true)})
 
     setSimulationClickHandler(/*clickGetPositionHandler*/
                               clickAddNutrientHandler)
