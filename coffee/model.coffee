@@ -20,7 +20,9 @@ EntityClassRegistery = {}
 
 strainTree = {'strain-0':[]}
 
-mutate = (heritableTraits, random, mutationRate = 0.2) ->
+mutationRate = 0.2
+
+mutate = (heritableTraits, random) ->
   heritableTraits = _.cloneDeep(heritableTraits)
   didMutate = false
   for traitName of heritableTraits  
