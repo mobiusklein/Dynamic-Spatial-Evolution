@@ -73,7 +73,7 @@ seekerNodes = [];
 
 function main(containerDiv, numWalkers, numSeekers, numPeriodicFood) {
     container = d3.select(containerDiv).append("svg").attr('width', arena.maxX).attr('height', arena.maxY)
-    d3.range(3).map(function(i){
+    /*d3.range(3).map(function(i){
         var pos = arena.randomPositionWithin()
         pos.height = 100
         pos.width = 20
@@ -84,7 +84,8 @@ function main(containerDiv, numWalkers, numSeekers, numPeriodicFood) {
         pos.height = 20
         pos.width = 100
         arena.addObject( new Blockade(pos) )
-    })
+    })*/
+    
     d3.range(numWalkers).map(function(i){arena.addWalker({type: "glucose", size: 1, stepSize: 10 }, true)})
     d3.range(numPeriodicFood).map(function(i){arena.addPeriodicWalker({type: "glucose", size: 1, frequency: 30}, true)})
     d3.range(numSeekers).map(function(i){arena.addSeeker({type: "e-coli", canEat: ["glucose", "bound-siderophore"]}, true)})

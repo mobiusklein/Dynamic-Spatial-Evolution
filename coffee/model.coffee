@@ -2,11 +2,15 @@
 if modules?
   console.log "Running in Node Mode"
   _ = require('lodash')
+  ss = require("simple-statistics")
+  ss.mixin()
   Random = require('random').Random
 if !_?
   throw Error("Unable to find Lo-Dash")
 if !Random?
   throw Error("Unable to find Random")
+if !ss?
+  throw Error("Unable to find simple-statistics")
 
 # ===============================================
 #    Global Application Functions
@@ -21,13 +25,14 @@ mutate = (heritableTraits, random, mutationRate = 0.2) ->
     if /strain/.test(traitName)
       continue
     probMutate = random.random()
+    # Genome always mutates
+    if traitName == 'genome'
+      probMutate = 0
     if probMutate <= mutationRate
       trait = heritableTraits[traitName]
       
-      console.log trait.currentValue
       trait.mutateFunction(trait, random)
       trait.currentValue = trait.cleanFunction(trait.currentValue)
-      console.log trait.currentValue
 
       trait.currentValue = trait.minValue if trait.currentValue < trait.minValue
       trait.currentValue = trait.maxValue if trait.currentValue > trait.maxValue
@@ -42,16 +47,62 @@ extendHeritable = (classType, newTraits) ->
   traitsCopy = _.extend(traitsCopy, _.cloneDeep(newTraits))
   return traitsCopy
 
+generateRandomGenome = (length) ->
+  rng = new Random()
+  genome = []
+  for i in [0...length]
+    genome.push(rng.choice([true, false]))
+  return genome
+
+alleleFrequency = (genomeSet) ->
+  frequencies = []
+  for ind in [0...genomeSet[0].length]
+    freq = [0, 0]
+    for genome in genomeSet
+      if genome[ind]
+        freq[0]++
+      else 
+          freq[1]++
+    freq = ((q/genomeSet[0].length) for q in freq)
+    frequencies.push freq
+  return frequencies
+
+tajimaD = (genomeSet) ->
+  frequencies = alleleFrequency(genomeSet)
+  numSegSites = genomeSet[0].length
+  sampleSize = genomeSet.length
+  sum = 0
+  for locus in frequencies
+    # Make sure site is segregating
+    if locus.some((g) -> return g.length == genomeSet[0].length)
+      numSegSites--
+      continue 
+    [p, q] = locus
+    sum += p*q
+  piEstimate = sum * sampleSize / (sampleSize-1)
+  a1 = (1/i for i in [1...sampleSize]).sum()
+  #console.log "a1 = #{a1}" if verbose
+  a2 = (1/(i**2) for i in [1...sampleSize]).sum()
+  #console.log "a2 = #{a2}" if verbose
+  b1 = (sampleSize + 1)/(3 * (sampleSize - 1))
+  #console.log "b1 = #{b1}" if verbose
+  b2 = (2 * ((sampleSize**2) + sampleSize + 3))/(9*sampleSize*(sampleSize - 1))
+  #console.log "b2 = #{b2}" if verbose
+  c1 = b1 - (1/a1)
+  #console.log "c1 = #{c1}" if verbose
+  c2 = b2 - ((sampleSize + 2)/(a1 * sampleSize)) + (a2/(a1**2))
+  #console.log "c2 = #{c2}" if verbose
+  e1 = c1/a1
+  e2 = c2/((a1**2) + a2)
+  numerator = piEstimate - (numSegSites / a1)
+  console.log("pi Estimate: #{piEstimate}, numSegSites/a1: #{numSegSites/a1}")
+  denominator = (e1 * numSegSites + (e2 * numSegSites * (numSegSites - 1))) ** 0.5
+  D = numerator/denominator
+  return D
+
 # ===============================================
 #    Utilities
 # ===============================================
-
-cleanArray = (array) ->
-  cleaned = []
-  for i in array
-    if i?
-      cleaned.push i 
-  return cleaned
 
 # ===============================================
 #    Arena
@@ -276,26 +327,33 @@ class Walker
     @random = if argObj.random then argObj.random else new Random(1)
 
     # Attach synchronous event hooks
-    @stepStartHook = if argObj.stepStartHook? then argObj.stepStartHook else []
-    @preMoveHook = if argObj.preMoveHook? then argObj.preMoveHook else []
-    @postMoveHook = if argObj.postMoveHook? then argObj.postMoveHook else []
-    @stepEndHook = if argObj.stepEndHook? then argObj.stepEndHook else []
+    @stepStartHook = if argObj.stepStartHook? then argObj.stepStartHook else {}
+    @preMoveHook = if argObj.preMoveHook? then argObj.preMoveHook else {}
+    @postMoveHook = if argObj.postMoveHook? then argObj.postMoveHook else {}
+    @stepEndHook = if argObj.stepEndHook? then argObj.stepEndHook else {}
 
-    @postMoveHook.push(@unstuck)
+    @postMoveHook["unstuck"] = @unstuck
 
 
   # Handle Event Hooks Functions
   stepStart: (boundsObj) ->
-    for fn in @stepStartHook
+    for fnName of @stepStartHook
+      fn = @stepStartHook[fnName]
       fn.apply(this, [boundsObj])
+  
   preMove: (boundsObj) ->
-    for fn in @preMoveHook
-      fn.apply(this, [boundsObj])
+    for fnName of @preMoveHook
+      fn = @preMoveHook[fnName]
+      fn.apply(this, [boundsObj])  
+
   postMove: (boundsObj) ->
-    for fn in @postMoveHook
+    for fnName of @postMoveHook
+      fn = @postMoveHook[fnName]
       fn.apply(this, [boundsObj])
+
   stepEnd: (boundsObj) ->
-    for fn in @stepEndHook
+    for fnName of @stepEndHook
+      fn = @stepEndHook[fnName]
       fn.apply(this, [boundsObj])
 
   unstuck: (boundsObj) ->
@@ -378,6 +436,7 @@ FACINGS = [
 
 class Seeker extends Walker
   @SEEKER_COUNT: 0
+  @baseGenome: generateRandomGenome(100)
   @heritableTraits: {
     stepSize: {
       baseValue: 5,
@@ -392,7 +451,15 @@ class Seeker extends Walker
       cleanFunction: Math.round,
     }
     genome: {
-      
+      baseValue: @baseGenome
+      currentValue: @baseGenome
+      perBaseMutationRate: 0.0001
+      mutateFunction: (trait, random) ->
+        numMutatedIndices = trait.currentValue.length * trait.perBaseMutationRate
+        mutatedIndices = random.sample((i for i in [0..trait.currentValue.length]), numMutatedIndices)
+        for i in mutatedIndices
+          trait.currentValue[i] = not trait.currentValue[i]
+      cleanFunction: (g) -> return g
     }
   }
   constructor: (argObj) ->
@@ -574,8 +641,8 @@ class Siderophore extends Walker
   @maturationTime: 30
   @matureValue: 6
   constructor: (argObj) ->
-    argObj.stepStartHook = [] if !argObj.stepStartHook?
-    argObj.stepStartHook.push((paramObj) -> @react() if @age > Siderophore.maturationTime and !@reacted)
+    argObj.stepStartHook = {} if !argObj.stepStartHook?
+    argObj.stepStartHook["react"] = ((paramObj) -> @react() if @age > Siderophore.maturationTime and !@reacted)
     argObj.type = 'siderophore'
     argObj.value = 0
     argObj.size = 2
@@ -608,19 +675,17 @@ class SiderophoreProducer extends Seeker
   })
   constructor: (argObj) ->
     argObj.canEat = [] if !argObj.canEat?
-    argObj.canEat.push 'bound-siderophore'
-    argObj.canEat.push 'glucose'
+    argObj.canEat.push 'bound-siderophore' if !('bound-siderophore' in argObj.canEat)
+    argObj.canEat.push 'glucose' if !('glucose' in argObj.canEat)
     argObj.type = 'siderophore-producer'
     argObj.heritableTraits = if !argObj.heritableTraits? then _.cloneDeep(SiderophoreProducer.heritableTraits) else argObj.heritableTraits
-    argObj.stepStartHook = [] if !argObj.stepStartHook?
-    argObj.stepStartHook.push ((paramObj) => 
+    argObj.stepStartHook = {} if !argObj.stepStartHook?
+    argObj.stepStartHook['produceSiderophore'] = ((paramObj) => 
       if @age % @siderophoreProductionRate == 0
         @produceSiderophore(paramObj)
       )
     super argObj    
     @id = "siderophore-producer-" + SiderophoreProducer.COUNT++
-    
-
 
   produceSiderophore: (boundsObj) ->
     @totalFood -= SiderophoreProducer.siderophoreCost
