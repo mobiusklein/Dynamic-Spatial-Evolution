@@ -676,9 +676,10 @@ class SiderophoreProducer extends Seeker
       currentValue: 30,
       minValue: 10,
       maxValue: 100,
-      gaussMean: -0.8
+      gaussMean: 1.2
+      gaussVariance: 3
       mutateFunction: (trait, random) ->
-        mod = random.gauss(trait.gaussMean, 1) * trait.baseValue
+        mod = random.gauss(trait.gaussMean, trait.gaussVariance)
         trait.currentValue += mod
       cleanFunction: Math.round,
     }

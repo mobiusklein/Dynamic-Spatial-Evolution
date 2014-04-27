@@ -898,10 +898,11 @@ SiderophoreProducer = (function(_super) {
       currentValue: 30,
       minValue: 10,
       maxValue: 100,
-      gaussMean: -0.8,
+      gaussMean: 1.2,
+      gaussVariance: 3,
       mutateFunction: function(trait, random) {
         var mod;
-        mod = random.gauss(trait.gaussMean, 1) * trait.baseValue;
+        mod = random.gauss(trait.gaussMean, trait.gaussVariance);
         return trait.currentValue += mod;
       },
       cleanFunction: Math.round
@@ -966,3 +967,5 @@ try {
   exports.Arena = Arena;
   exports.Utils = {};
 } catch (_error) {}
+
+//# sourceMappingURL=model.map
