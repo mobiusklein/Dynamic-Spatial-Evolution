@@ -308,13 +308,13 @@ function highcharts_scatter() {
             },
             xAxis: {
                 title: {
-                    text: 'Consumers'
+                    text: 'Producers'
                 }
 
             },
             yAxis: {
                 title: {
-                    text: 'Producers'
+                    text: 'Consumers'
                 },
                 plotLines: [{
                     value: 0,
