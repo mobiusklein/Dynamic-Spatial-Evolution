@@ -2,66 +2,114 @@
 if modules?
   console.log "Running in Node Mode"
   _ = require('lodash')
+  ss = require("simple-statistics")
+  ss.mixin()
   Random = require('random').Random
 if !_?
   throw Error("Unable to find Lo-Dash")
 if !Random?
   throw Error("Unable to find Random")
+if !ss?
+  throw Error("Unable to find simple-statistics")
+
+# ===============================================
+#    Global Application Functions
+# ===============================================
 
 EntityClassRegistery = {}
 
+strainTree = {'strain-0':[]}
+
 mutationRate = 0.2
+
 mutate = (heritableTraits, random) ->
-  heritableTraits = copy(heritableTraits)
+  heritableTraits = _.cloneDeep(heritableTraits)
   didMutate = false
   for traitName of heritableTraits  
     if /strain/.test(traitName)
       continue
     probMutate = random.random()
+    # Genome always mutates
+    if traitName == 'genome'
+      probMutate = 0
     if probMutate <= mutationRate
       trait = heritableTraits[traitName]
-      #console.log "Mutation: #{probMutate}"
       
-      mod = random.gauss(trait.randMean)
-      #console.log "Modifier: #{mod}"
-      
-      trait.currentValue += mod
+      trait.mutateFunction(trait, random)
       trait.currentValue = trait.cleanFunction(trait.currentValue)
 
       trait.currentValue = trait.minValue if trait.currentValue < trait.minValue
       trait.currentValue = trait.maxValue if trait.currentValue > trait.maxValue
 
-      didMutate = true
-#  if didMutate
-#    heritableTraits.strain = "strain-#{++strainCount}"
+      didMutate = true if traitName != "genome"
+  if didMutate
+    parentStrain = heritableTraits.strain.currentValue
+    heritableTraits.strain.currentValue = _.uniqueId("strain-")
+    strainTree[parentStrain].push heritableTraits.strain.currentValue
+    strainTree[heritableTraits.strain.currentValue] = []
   return heritableTraits
 
+extendHeritable = (classType, newTraits) ->
+  traitsCopy = _.cloneDeep(classType.heritableTraits)
+  traitsCopy = _.extend(traitsCopy, _.cloneDeep(newTraits))
+  return traitsCopy
+
+generateRandomGenome = (length) ->
+  rng = new Random()
+  genome = []
+  for i in [0...length]
+    genome.push(rng.choice([true, false]))
+  return genome
+
+alleleFrequency = (genomeSet) ->
+  frequencies = []
+  for ind in [0...genomeSet[0].length]
+    freq = [0, 0]
+    for genome in genomeSet
+      if genome[ind]
+        freq[0]++
+      else 
+          freq[1]++
+    freq = ((q/genomeSet[0].length) for q in freq)
+    frequencies.push freq
+  return frequencies
+
+tajimaD = (genomeSet) ->
+  frequencies = alleleFrequency(genomeSet)
+  numSegSites = genomeSet[0].length
+  sampleSize = genomeSet.length
+  sum = 0
+  for locus in frequencies
+    # Make sure site is segregating
+    if locus.some((g) -> return g.length == genomeSet[0].length)
+      numSegSites--
+      continue 
+    [p, q] = locus
+    sum += p*q
+  piEstimate = sum * sampleSize / (sampleSize-1)
+  a1 = (1/i for i in [1...sampleSize]).sum()
+  #console.log "a1 = #{a1}" if verbose
+  a2 = (1/(i**2) for i in [1...sampleSize]).sum()
+  #console.log "a2 = #{a2}" if verbose
+  b1 = (sampleSize + 1)/(3 * (sampleSize - 1))
+  #console.log "b1 = #{b1}" if verbose
+  b2 = (2 * ((sampleSize**2) + sampleSize + 3))/(9*sampleSize*(sampleSize - 1))
+  #console.log "b2 = #{b2}" if verbose
+  c1 = b1 - (1/a1)
+  #console.log "c1 = #{c1}" if verbose
+  c2 = b2 - ((sampleSize + 2)/(a1 * sampleSize)) + (a2/(a1**2))
+  #console.log "c2 = #{c2}" if verbose
+  e1 = c1/a1
+  e2 = c2/((a1**2) + a2)
+  numerator = piEstimate - (numSegSites / a1)
+  console.log("pi Estimate: #{piEstimate}, numSegSites/a1: #{numSegSites/a1}")
+  denominator = (e1 * numSegSites + (e2 * numSegSites * (numSegSites - 1))) ** 0.5
+  D = numerator/denominator
+  return D
 
 # ===============================================
 #    Utilities
 # ===============================================
-
-# Create a deep copy of obj. Does not work on nested objects. Uses
-# JSON serialization to break all bindings. If called on `undefined`
-# returns {} instead
-# 
-# Not suitable for copying any object that contains an instance of 
-# Random, as it will break the random seeding consistency.
-copy = (obj) ->
-  if !obj? or ("object" != typeof obj)
-    return obj
-  clone = obj.constructor({})
-  for attr of obj
-    if (obj.hasOwnProperty(attr))
-      clone[attr] = copy(obj[attr])
-  return clone
-
-cleanArray = (array) ->
-  cleaned = []
-  for i in array
-    if i?
-      cleaned.push i 
-  return cleaned
 
 # ===============================================
 #    Arena
@@ -286,26 +334,33 @@ class Walker
     @random = if argObj.random then argObj.random else new Random(1)
 
     # Attach synchronous event hooks
-    @stepStartHook = if argObj.stepStartHook? then argObj.stepStartHook else []
-    @preMoveHook = if argObj.preMoveHook? then argObj.preMoveHook else []
-    @postMoveHook = if argObj.postMoveHook? then argObj.postMoveHook else []
-    @stepEndHook = if argObj.stepEndHook? then argObj.stepEndHook else []
+    @stepStartHook = if argObj.stepStartHook? then argObj.stepStartHook else {}
+    @preMoveHook = if argObj.preMoveHook? then argObj.preMoveHook else {}
+    @postMoveHook = if argObj.postMoveHook? then argObj.postMoveHook else {}
+    @stepEndHook = if argObj.stepEndHook? then argObj.stepEndHook else {}
 
-    @postMoveHook.push(@unstuck)
+    @postMoveHook["unstuck"] = @unstuck
 
 
   # Handle Event Hooks Functions
   stepStart: (boundsObj) ->
-    for fn in @stepStartHook
+    for fnName of @stepStartHook
+      fn = @stepStartHook[fnName]
       fn.apply(this, [boundsObj])
+  
   preMove: (boundsObj) ->
-    for fn in @preMoveHook
-      fn.apply(this, [boundsObj])
+    for fnName of @preMoveHook
+      fn = @preMoveHook[fnName]
+      fn.apply(this, [boundsObj])  
+
   postMove: (boundsObj) ->
-    for fn in @postMoveHook
+    for fnName of @postMoveHook
+      fn = @postMoveHook[fnName]
       fn.apply(this, [boundsObj])
+
   stepEnd: (boundsObj) ->
-    for fn in @stepEndHook
+    for fnName of @stepEndHook
+      fn = @stepEndHook[fnName]
       fn.apply(this, [boundsObj])
 
   unstuck: (boundsObj) ->
@@ -313,6 +368,9 @@ class Walker
       console.log "Unstuck! #{@id}"
       boundsObj.randomPositionWithin(this, true)
 
+
+  onEaten: (eater) ->
+    eater.totalFood += @value
 
   step: (boundsObj) ->
     # Increase Age
@@ -375,23 +433,43 @@ EntityClassRegistery["Walker"] = Walker
 FACINGS = [
   [0, 1],
   [1, 0],
-  [0,-1],
-  [-1,0],
-  [1,1],
-  [1,-1],
-  [-1,1],
-  [-1,-1]
+  [0, -1],
+  [-1, 0],
+  [1, 1],
+  [1, -1],
+  [-1, 1],
+  [-1, -1]
 ]
 
 class Seeker extends Walker
   @SEEKER_COUNT: 0
+  @baseGenome: generateRandomGenome(100)
   @heritableTraits: {
     stepSize: {
       baseValue: 5,
       currentValue: 5,
       minValue: 1,
       maxValue: 100,
+      gaussMean: -0.8,
+      gaussVariance: 3,
+      mutateFunction: (trait, random) ->
+        mod = random.gauss(trait.gaussMean, trait.gaussVariance)
+        trait.currentValue += mod
       cleanFunction: Math.round,
+    }
+    genome: {
+      baseValue: @baseGenome
+      currentValue: @baseGenome
+      perBaseMutationRate: 0.0001
+      mutateFunction: (trait, random) ->
+        numMutatedIndices = trait.currentValue.length * trait.perBaseMutationRate
+        mutatedIndices = random.sample((i for i in [0..trait.currentValue.length]), numMutatedIndices)
+        for i in mutatedIndices
+          trait.currentValue[i] = not trait.currentValue[i]
+      cleanFunction: (g) -> return g
+    }
+    strain:{
+      currentValue: "strain-0"
     }
   }
   constructor: (argObj) ->
@@ -411,14 +489,14 @@ class Seeker extends Walker
       0.1
     ]
     
-    @heritableTraits = if !argObj.heritableTraits? then copy(Seeker.heritableTraits) else argObj.heritableTraits
+    @heritableTraits = if !argObj.heritableTraits? then _.cloneDeep(Seeker.heritableTraits) else argObj.heritableTraits
 
     # Apply Seeker's defaults in place of Walker defaults
     @size = (if !argObj.size? then 5 else argObj.size)
     @stepSize = (if !argObj.stepSize? then 5 else argObj.stepSize)
-    @totalFood = 100
-    @minimumReplicationFoodThreshold = argObj.minimumReplicationFoodThreshold or 350
-    @BMR = argObj.BMR or (optsObj) -> @totalFood -= @stepSize/1000
+    @totalFood = argObj.startingFood or 75
+    @minimumReplicationFoodThreshold = argObj.minimumReplicationFoodThreshold or 300
+    @BMR = argObj.BMR or (optsObj) -> @totalFood -= (@stepSize + (@stepSize - @heritableTraits.stepSize.baseValue))/1000
     @minimumReplicationDelay = argObj.minimumReplicationDelay or 10
     @eaten = 0
     @lastEaten = [0,0,0]
@@ -451,7 +529,7 @@ class Seeker extends Walker
     for close in closeThings
       for o in close
         if (o.type in @canEat) and not o.mark
-          @totalFood += o.value
+          o.onEaten(this)
           @eaten += 1
           o.mark = true
           remove.push o
@@ -561,6 +639,7 @@ class Seeker extends Walker
   inherit: () ->
     for traitName of @heritableTraits
       this[traitName] = @heritableTraits[traitName].currentValue
+
 EntityClassRegistery["Seeker"] = Seeker
 # ===============================================
 #    Siderophore
@@ -572,13 +651,14 @@ class Siderophore extends Walker
   @maturationTime: 30
   @matureValue: 6
   constructor: (argObj) ->
-    argObj.stepStartHook = [] if !argObj.stepStartHook?
-    argObj.stepStartHook.push((paramObj) -> @react() if @age > Siderophore.maturationTime and !@reacted)
+    argObj.stepStartHook = {} if !argObj.stepStartHook?
+    argObj.stepStartHook["react"] = ((paramObj) -> @react() if @age > Siderophore.maturationTime and !@reacted)
     argObj.type = 'siderophore'
     argObj.value = 0
     argObj.size = 2
     super argObj
     @reacted = false
+    @spawnedBy =argObj.spawnedBy
 
   react: ->
     @reacted = true
@@ -590,41 +670,37 @@ class SiderophoreProducer extends Seeker
   @siderophoreCost: 3
   @siderophoreProductionRate: 30
   @COUNT: 0
-  @heritableTraits: {
-    stepSize: {
-      baseValue: 5,
-      currentValue: 5,
-      minValue: 1,
-      maxValue: 100,
-      cleanFunction: Math.round,
-    },
+  @heritableTraits: extendHeritable(Seeker,{
     siderophoreProductionRate: {
       baseValue: 30,
       currentValue: 30,
-      minValue: 1,
+      minValue: 10,
       maxValue: 100,
+      gaussMean: 1.2
+      gaussVariance: 3
+      mutateFunction: (trait, random) ->
+        mod = random.gauss(trait.gaussMean, trait.gaussVariance)
+        trait.currentValue += mod
       cleanFunction: Math.round,
     }
-  }
+  })
   constructor: (argObj) ->
     argObj.canEat = [] if !argObj.canEat?
-    argObj.canEat.push 'bound-siderophore'
-    argObj.canEat.push 'glucose'
+    argObj.canEat.push 'bound-siderophore' if !('bound-siderophore' in argObj.canEat)
+    argObj.canEat.push 'glucose' if !('glucose' in argObj.canEat)
     argObj.type = 'siderophore-producer'
-    argObj.heritableTraits = if !argObj.heritableTraits? then copy(SiderophoreProducer.heritableTraits) else argObj.heritableTraits
-    argObj.stepStartHook = [] if !argObj.stepStartHook?
-    argObj.stepStartHook.push ((paramObj) => 
-      if @age % @siderophoreProductionRate == 0
+    argObj.heritableTraits = if !argObj.heritableTraits? then _.cloneDeep(SiderophoreProducer.heritableTraits) else argObj.heritableTraits
+    argObj.stepStartHook = {} if !argObj.stepStartHook?
+    argObj.stepStartHook['produceSiderophore'] = ((paramObj) -> 
+      if (@age % @siderophoreProductionRate == 0) and (@totalFood > 50)
         @produceSiderophore(paramObj)
       )
     super argObj    
     @id = "siderophore-producer-" + SiderophoreProducer.COUNT++
-    
-
 
   produceSiderophore: (boundsObj) ->
     @totalFood -= SiderophoreProducer.siderophoreCost
-    pos = {x: @x, y: @y}
+    pos = {x: @x, y: @y, spawnedBy: @id}
     siderophore = new Siderophore(pos)
     boundsObj.addObject(siderophore)
 
@@ -646,4 +722,4 @@ try
   exports.Walker = Walker
   exports.Seeker = Seeker
   exports.Arena = Arena
-  exports.Utils = {fillRegionWithPolygon: fillRegionWithPolygon, copy: copy}
+  exports.Utils = {}

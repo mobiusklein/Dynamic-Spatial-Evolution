@@ -8,6 +8,11 @@
     <script src="bower_components/bootstrap/dist/js/bootstrap.min.js"></script>
     <script src="node_modules/lodash/lodash.js"></script>
     <script src="node_modules/random/random.js"></script>
+    <script src="node_modules/simple-statistics/src/simple_statistics.js"></script>
+    <script type="text/javascript"> ss.mixin() </script>
+    
+    <script src="http://code.highcharts.com/highcharts.js"></script>
+    <script src="http://code.highcharts.com/modules/exporting.js"></script>
     <!-- CSS Libraries -->
     <link rel="stylesheet" type="text/css" href="bower_components\bootswatch\cerulean\bootstrap.min.css">
     <link rel="stylesheet" type="text/css" href="bower_components\font-awesome\css\font-awesome.css">
@@ -35,7 +40,7 @@
         background: lightgrey;
     }
 
-    rect {
+    rect.blockade {
         fill: rgb(32,0,0);
         rx: 10;
         ry: 10;
@@ -89,7 +94,7 @@
     }
 
     $(function() {
-        main("#simulation-container", 0, 5, 20)
+        main("#simulation-container", 0, 1, 5, 20)
         var running = true
         $('#toggle-running-btn').click(function() {
             var handle = $(this)
@@ -103,6 +108,12 @@
                 running = true
             }
         })
+        $("#inspect-btn").click(function(){
+            setSimulationClickHandler(clickGetPositionHandler)
+        });
+        $("#food-dropper-btn").click(function(){
+            setSimulationClickHandler(clickAddNutrientHandler)
+        });
         updateStatusTable()
         setInterval(updateStatusTable, 1000)
     })
@@ -122,10 +133,12 @@
         </div>
         <div class='col-md-4' id='control-container'>
             <div class='clearfix'>
-                <button id="toggle-running-btn" class='btn btn-primary btn' data-running=true style='margin: 10px; float:left;'>Pause simulation</button>
-                <button id="toggle-food-button" class='btn btn-primary' style='margin: 10px; float:left;'>Food Dropper</button>
+                <button id="toggle-running-btn" class='btn btn-primary' data-running=true style='margin: 10px; float:left;'>Pause simulation</button>
+                <button id="food-dropper-btn" class='btn btn-primary' style='margin: 10px; float:left;'>Food Dropper</button>
+                <button id="toggle-table-btn" class='btn btn-primary' onclick="$('#status-table').toggle()" style='margin: 10px;float:left'>Show Status</button>
+                <button id="inspect-btn" class='btn btn-primary' style='margin: 10px; float: left;'>Inspector</button>
             </div>
-            <table class='table table-bordered'>
+            <table id='status-table' class='table table-bordered'>
                 <thead>
                     <tr>
                         <th>ID</th>
@@ -139,8 +152,11 @@
         </div>
     </div>
     <div class='row'>
-        <div class='col-md-6'>
-            Metabolite diffusion visualized as a random walk in two dimensions.
+        <div id='plot-spline' class='col-md-6'>
+            
+        </div>
+        <div id='plot-scatter' class='col-md-6'>
+            
         </div>
     </div>
 </body>
