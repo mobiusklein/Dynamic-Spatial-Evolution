@@ -496,7 +496,7 @@ class Seeker extends Walker
     @stepSize = (if !argObj.stepSize? then 5 else argObj.stepSize)
     @totalFood = argObj.startingFood or 75
     @minimumReplicationFoodThreshold = argObj.minimumReplicationFoodThreshold or 300
-    @BMR = argObj.BMR or (optsObj) -> @totalFood -= (@stepSize ** 2)/1000
+    @BMR = argObj.BMR or (optsObj) -> @totalFood -= (@stepSize + (@stepSize - @heritableTraits.stepSize.baseValue))/1000
     @minimumReplicationDelay = argObj.minimumReplicationDelay or 10
     @eaten = 0
     @lastEaten = [0,0,0]

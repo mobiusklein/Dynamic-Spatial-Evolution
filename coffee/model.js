@@ -668,7 +668,7 @@ Seeker = (function(_super) {
     this.totalFood = argObj.startingFood || 75;
     this.minimumReplicationFoodThreshold = argObj.minimumReplicationFoodThreshold || 300;
     this.BMR = argObj.BMR || function(optsObj) {
-      return this.totalFood -= (Math.pow(this.stepSize, 2)) / 1000;
+      return this.totalFood -= (this.stepSize + (this.stepSize - this.heritableTraits.stepSize.baseValue)) / 1000;
     };
     this.minimumReplicationDelay = argObj.minimumReplicationDelay || 10;
     this.eaten = 0;
