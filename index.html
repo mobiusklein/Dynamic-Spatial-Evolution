@@ -7,7 +7,7 @@
     <script src="bower_components/d3/d3.min.js"></script>
     <script src="bower_components/bootstrap/dist/js/bootstrap.min.js"></script>
     <script src="node_modules/lodash/lodash.js"></script>
-    <script src="node_modules/random/random.js"></script>
+    <script src="node_modules/random-js/random.js"></script>
     <script src="node_modules/simple-statistics/src/simple_statistics.js"></script>
     <script type="text/javascript"> ss.mixin() </script>
     
@@ -94,7 +94,7 @@
     }
 
     $(function() {
-        main("#simulation-container", 0, 1, 5, 20)
+        main("#simulation-container", 0, 1, 5, 0)
         var running = true
         $('#toggle-running-btn').click(function() {
             var handle = $(this)
@@ -114,6 +114,7 @@
         $("#food-dropper-btn").click(function(){
             setSimulationClickHandler(clickAddNutrientHandler)
         });
+        mutationRate = 0.75
         updateStatusTable()
         setInterval(updateStatusTable, 1000)
     })
@@ -137,6 +138,9 @@
                 <button id="food-dropper-btn" class='btn btn-primary' style='margin: 10px; float:left;'>Food Dropper</button>
                 <button id="toggle-table-btn" class='btn btn-primary' onclick="$('#status-table').toggle()" style='margin: 10px;float:left'>Show Status</button>
                 <button id="inspect-btn" class='btn btn-primary' style='margin: 10px; float: left;'>Inspector</button>
+                <div id='experimental'>
+                    <button id='jump-100-btn' class="btn btn-primary" onclick="for(var i=0;i<100;i++)arena.tick()" style='margin: 10px;float:left'>Jump 100</button>
+                </div>
             </div>
             <table id='status-table' class='table table-bordered'>
                 <thead>

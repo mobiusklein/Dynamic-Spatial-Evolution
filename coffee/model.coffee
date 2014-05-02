@@ -1,14 +1,16 @@
 # require Node modules for offline use
-if modules?
+if module?
   console.log "Running in Node Mode"
   _ = require('lodash')
   ss = require("simple-statistics")
   ss.mixin()
-  Random = require('random').Random
+  Random = require('random-js').Random
+
+# Validate that dependencies are available.
 if !_?
-  throw Error("Unable to find Lo-Dash")
+  throw Error("Unable to find lodash")
 if !Random?
-  throw Error("Unable to find Random")
+  throw Error("Unable to find random")
 if !ss?
   throw Error("Unable to find simple-statistics")
 
@@ -16,16 +18,21 @@ if !ss?
 #    Global Application Functions
 # ===============================================
 
+# A name-to-class mapping for use in future serialization solutions
 EntityClassRegistery = {}
 
-strainTree = {'strain-0':[]}
+# A phylogenetic tree structure for storing strain branching.
+StrainTree = {'strain-0':[]}
 
+# The global trait mutation rate. Value should be made a parameter.
 mutationRate = 0.2
 
-mutate = (heritableTraits, random) ->
-  heritableTraits = _.cloneDeep(heritableTraits)
+# 
+mutate = (heritableTraitsBase, random) ->
+  heritableTraits = _.cloneDeep(heritableTraitsBase)
   didMutate = false
   for traitName of heritableTraits  
+    # Ignore the strain trait
     if /strain/.test(traitName)
       continue
     probMutate = random.random()
@@ -41,12 +48,13 @@ mutate = (heritableTraits, random) ->
       trait.currentValue = trait.minValue if trait.currentValue < trait.minValue
       trait.currentValue = trait.maxValue if trait.currentValue > trait.maxValue
 
+      # A change in traits means we should describe a new strain. Doesn't count for the genome.
       didMutate = true if traitName != "genome"
   if didMutate
     parentStrain = heritableTraits.strain.currentValue
     heritableTraits.strain.currentValue = _.uniqueId("strain-")
-    strainTree[parentStrain].push heritableTraits.strain.currentValue
-    strainTree[heritableTraits.strain.currentValue] = []
+    StrainTree[parentStrain].push heritableTraits.strain.currentValue
+    StrainTree[heritableTraits.strain.currentValue] = []
   return heritableTraits
 
 extendHeritable = (classType, newTraits) ->
@@ -102,7 +110,7 @@ tajimaD = (genomeSet) ->
   e1 = c1/a1
   e2 = c2/((a1**2) + a2)
   numerator = piEstimate - (numSegSites / a1)
-  console.log("pi Estimate: #{piEstimate}, numSegSites/a1: #{numSegSites/a1}")
+  console.log("pi Estimate: #{piEstimate}, numSegSites: #{numSegSites}")
   denominator = (e1 * numSegSites + (e2 * numSegSites * (numSegSites - 1))) ** 0.5
   D = numerator/denominator
   return D
@@ -156,7 +164,7 @@ class Arena
   addPeriodicWalker: (opts, force = false) ->
     #opts = @randomPositionWithin(opts, force)
     opts.frequency = opts.frequency or 20
-    fn = ()=>
+    fn = () ->
       self.addWalker @randomPositionWithin(opts, force)
       return
     fn.frequency = opts.frequency
@@ -188,7 +196,7 @@ class Arena
     opts.y = Math.floor(opts.y)
 
     # Make sure you're not located in a Blockade
-    if @positions[opts.x]? and @positions[opts.x][opts.y]? and @positions[opts.x][opts.y].some((entity) -> return entity.solid)
+    if @positions[opts.x]? and @positions[opts.x][opts.y]? and @positions[opts.x][opts.y].some((entity) -> return entity.isBlockade)
       opts = @randomPositionWithin(opts, true)
 
     return opts
@@ -248,7 +256,7 @@ class Arena
     @actors = survivors
 
     @periodics.forEach (func, i) ->
-      func()  if self.ticker % func.frequency is 0
+      func.apply(self, null)  if self.ticker % func.frequency is 0
       return
 
     return
@@ -270,6 +278,10 @@ class Blockade
     @height = argObj.height
     
     @solid = true
+
+    #Predicates
+    @isBlockade = true
+    @isWalker = false
 
     @state = ""
     Blockade.COUNT++
@@ -324,6 +336,10 @@ class Walker
 
     # Number of time steps since this entity was born
     @age = 0
+
+    # Type predicates
+    @isBlockade = false
+    @isWalker = true
 
     # This entity has not been marked yet, so it can be interacted with
     @mark = false
@@ -722,4 +738,9 @@ try
   exports.Walker = Walker
   exports.Seeker = Seeker
   exports.Arena = Arena
+  exports.Siderophore = Siderophore
+  exports.SiderophoreProducer = SiderophoreProducer
+  exports.EntityClassRegistery = EntityClassRegistery
+  exports.StrainTree = StrainTree
+  exports.mutate = mutate
   exports.Utils = {}

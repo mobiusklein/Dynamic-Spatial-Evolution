@@ -86,10 +86,10 @@ function main(containerDiv, numWalkers, numConsumers, numProducers , numPeriodic
         arena.addObject( new Blockade(pos) )
     })*/
     
-    pos1 = {x: 375, y:50, height:150, width:20}
-    arena.addObject( new Blockade(pos1) )
-    pos2 = {x: 375,  y:450, height:150, width:20}
-    arena.addObject( new Blockade(pos2) )
+    topBlock = {x: 375, y:50, height:175, width:20}
+    arena.addObject( new Blockade(topBlock) )
+    bottomBlock = {x: 375,  y:450, height:175, width:20}
+    arena.addObject( new Blockade(bottomBlock) )
 
     d3.range(numWalkers).map(function(i){arena.addWalker({type: "glucose", size: 1, stepSize: 10 }, true)})
     d3.range(numPeriodicFood).map(function(i){arena.addPeriodicWalker({type: "glucose", size: 1, frequency: 30}, true)})
