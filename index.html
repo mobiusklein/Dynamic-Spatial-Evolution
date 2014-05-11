@@ -66,10 +66,14 @@
         stroke: black !important;
     }
 
-    .starving{
+    .seeker.starving{
         fill: purple !important;
+        fill-opacity: .5;
     }
-
+    .seeker.starving.siderophore-producer{
+        fill: black !important;
+        fill-opacity: .5;
+    }
     .selected{
         stroke-width: 5px !important;
     }
@@ -99,11 +103,11 @@
         $('#toggle-running-btn').click(function() {
             var handle = $(this)
             if (running) {
-                timeManager.pauseSimulation()
+                timerManagers.stopAll()
                 handle.text("Resume simulation")
                 running = false
             } else {
-                timeManager.startSimulation()
+                timerManagers.startAll()
                 handle.text("Pause simulation")
                 running = true
             }
@@ -116,7 +120,7 @@
         });
         mutationRate = 0.75
         updateStatusTable()
-        setInterval(updateStatusTable, 1000)
+        timerManagers.add("updateTable", new TimerManager(1000, updateStatusTable))
     })
     </script>
 </head>

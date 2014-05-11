@@ -138,6 +138,7 @@ class Arena
     @actors = []
     @walkers = []
     @blockades = []
+    @fixtures = []
     @periodics = []
 
     @save = argObj.save or false
@@ -227,12 +228,22 @@ class Arena
     for block in @blockades
       @setPosition(block)
 
+    for fixture in @fixtures
+      expired = fixture.step(this)
+      for ex in expired
+        deceased[ex.id] = true
+      @setPosition(fixture)
+
+    survivors = []
+    for fixture in @fixtures
+      if fixture.id not in deceased
+        survivors.push fixture
+    @fixtures = survivors
+    deceased = {}
 
     for walker in @walkers
       walker.step(this)
       @setPosition(walker)
-
-    dead = []
 
     for actor in @actors
       dead = actor.step(this)
@@ -244,8 +255,6 @@ class Arena
     @walkers.forEach (obj, i) ->
       if !deceased[obj.id]?
         survivors.push obj
-      else
-        obj.state = "dead"
       return
     @walkers = survivors
 
@@ -309,7 +318,67 @@ class Blockade
         boundsObj.positions[x][y].push this
 EntityClassRegistery["Blockade"] = Blockade
 
+# ===============================================
+#    Fixture
+#    Defines an immobile region that has periodic behavior.
+# =============================================== 
 
+class Fixture
+  @COUNT: 0
+  constructor: (argObj) ->
+    @id = 'fixture-' + Fixture.COUNT++
+    @x = argObj.x
+    @y = argObj.y
+
+    @width = argObj.width
+    @height = argObj.height
+    
+    @age = 0
+
+    @solid = false
+
+    #Predicates
+    @isBlockade = false
+    @isWalker = false
+    @isFixture = true
+
+    @random = if argObj.random then argObj.random else new Random(1)
+    @mark = false
+
+    @actions = if argObj.actions? then argObj.actions else {}
+
+  doActions: (boundsObj) ->
+    for fnName of @actions
+      fn = @actions[fnName]
+      fn.apply(this, [boundsObj])
+
+  step: (argObj) ->
+    @age++
+    @doActions()
+
+  fillRegion: (boundsObj) ->
+    minX = @x - @width
+    minY = @y - @height
+    minX = if minX >= 0 then minX else 0
+    minY = if minY >= 0 then minY else 0
+
+    maxX = @x + @width
+    maxY = @y + @height
+
+    maxX = if maxX > @maxX then @maxX else maxX
+    maxY = if maxY > @maxY then @maxY else maxY
+
+    xAxisRange = (x for x in [minX..maxX])
+    yAxisRange = (y for y in [minY..maxY])
+
+    # Fill space around the position of this object
+    for x in xAxisRange
+      for y in yAxisRange
+        boundsObj.positions[x] = {} if !boundsObj.positions[x]?
+        boundsObj.positions[x][y] = []  if !boundsObj.positions[x][y]?
+        boundsObj.positions[x][y].push this
+
+EntityClassRegistery["Fixture"] = Fixture
 # ===============================================
 #    Walker
 #    Defines an object which traverses the arena in a random walk. 
@@ -492,7 +561,10 @@ class Seeker extends Walker
     super argObj
     # Override the Walker ID
     @id = "seeker-" + Seeker.SEEKER_COUNT
-    @canEat = if argObj.canEat? then argObj.canEat else ['food']
+    #
+    # TODO Switch to Object from Array to specify type-specific eating behavior
+    #
+    @canEat = if argObj.canEat? then argObj.canEat else ['food'] 
     @solid = true
     
     # Movement
@@ -735,9 +807,10 @@ class SiderophoreProducer extends Seeker
 #Export Classes for Node 
 #
 try
+  exports.Arena = Arena
+  exports.Blockade = Blockade
   exports.Walker = Walker
   exports.Seeker = Seeker
-  exports.Arena = Arena
   exports.Siderophore = Siderophore
   exports.SiderophoreProducer = SiderophoreProducer
   exports.EntityClassRegistery = EntityClassRegistery

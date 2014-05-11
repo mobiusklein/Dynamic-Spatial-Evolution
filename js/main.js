@@ -1,24 +1,73 @@
 var arena = new Arena({minX: 0, maxX: 750, minY: 0, maxY: 500})
 
 
-var TimeManager = function(tickInterval, fn){
-    this.timerID = null
-    this.startSimulation = null
-    this.pauseSimulation = null
+var TimerMangerSet = function(managers){
+    managers = managers === undefined ? {} : managers
+    this.managers = managers
+}
+
+TimerMangerSet.prototype.startAll = function(){
+    var keys = Object.keys(this.managers)
+    for(var kI = 0; kI < keys.length; kI++){
+        var manager = this.managers[keys[kI]]
+        manager.start()
+    }
+}
+
+TimerMangerSet.prototype.stopAll = function(){
+    var keys = Object.keys(this.managers)
+    for(var kI = 0; kI < keys.length; kI++){
+        var manager = this.managers[keys[kI]]
+        manager.stop()
+    }
+}
+
+TimerMangerSet.prototype.add = function(key, manager, noStart){
+    this.managers[key] = manager
+    if(!noStart){
+        manager.start()
+    }
+}
+
+TimerMangerSet.prototype.remove = function(key){
+    this.managers[key].stop()
+    delete this.managers[key]
+}
+
+
+var TimerManager = function(tickInterval, fn){
+    this.timerID = []
     this.tickInterval = tickInterval
     this.fn = fn
 }
-TimeManager.prototype.startSimulation = function(){
-        this.timerID = setInterval(tick, this.tickInterval)
-} 
-TimeManager.prototype.pauseSimulation = function(){
-        clearInterval(this.timerID)
+
+TimerManager.prototype.callFn = function(){
+    var self = this;
+    var fnal = self.fn
+    if(fn instanceof Array){
+        fnal = function(){
+            for(var i = 0; i < self.fn.length; i++)self.fn[i]()
+        }
+    }
+    return fnal
 }
-TimeManager.prototype.setSpeed = function(tickInterval){
+
+TimerManager.prototype.setSpeed = function(tickInterval){
         tickInterval = tickInterval === undefined ? this.tickInterval : tickInterval
-        clearInterval(this.timerID)
         this.tickInterval = tickInterval
-        this.timerID = setInterval(this.fn, this.tickInterval)    
+        this.stop()
+        this.start()
+}
+
+TimerManager.prototype.start = function(){
+    this.timerID.push(setInterval(this.fn, this.tickInterval))
+}
+
+TimerManager.prototype.stop = function(){
+    for(var t = 0; t < this.timerID.length; t++){
+        clearInterval(this.timerID[t])
+    }
+    this.timerID = []
 }
 
 String.prototype.sluggify = function(){
@@ -28,12 +77,16 @@ String.prototype.sluggify = function(){
     return slug
 }
 
+var selectedEntity = null
 function clickSeekerHandler(d, i, j){
     $('.selected').removeClass('selected')
     seekerNodes.attr('selected', function(d){d.selected = false; return false})
     $('#' + d.id).addClass('selected')
     d.selected = true
+    selectedEntity = d
 }
+
+
 
 
 
@@ -63,8 +116,7 @@ function zoomed() {
 }
 var zoom = d3.behavior.zoom().scaleExtent([1, 10])
 
-
-timeManager = {}
+timerManagers = new TimerMangerSet()
 container = {}
 blockadeNodes = [];
 walkerNodes = [];
@@ -98,6 +150,7 @@ function main(containerDiv, numWalkers, numConsumers, numProducers , numPeriodic
 
     setSimulationClickHandler(/*clickGetPositionHandler*/
                               clickAddNutrientHandler)
+    //tick closure
     function tick(d){
         /* Run the model forward one time step */
         arena.tick()
@@ -142,16 +195,10 @@ function main(containerDiv, numWalkers, numConsumers, numProducers , numPeriodic
             .on("click", clickSeekerHandler)
         seekerNodes.exit().remove()
     }/*End tick()*/
-    timeManager = new TimeManager(1, tick)
-    timeManager.setSpeed()
-    timeManager.startSimulation = function(){
-        this.timerID = setInterval(tick, this.tickInterval)
-    } 
-    timeManager.pauseSimulation = function(){
-        clearInterval(this.timerID)
-    }
-    splineChart = populationSpline()
-    highcharts_scatter()
+    timerManagers.add("tick", new TimerManager(10, tick))
+
+    /*splineChart = populationSpline()
+    highcharts_scatter()*/
 }
 
 
