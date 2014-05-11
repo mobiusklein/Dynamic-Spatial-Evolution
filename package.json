@@ -1,0 +1,16 @@
+{
+    "name": "dynamic-spatial-evolution",
+    "version": 0.1,
+    "dependencies": {
+        "lodash": ">=2.4",
+        "simple-statistics": ">=0.7.0",
+        "random-js": "mobiusklein/random-js"
+    },
+    "files": [
+        "coffee/",
+        "js/"
+        "./"
+    ]
+        
+
+}
