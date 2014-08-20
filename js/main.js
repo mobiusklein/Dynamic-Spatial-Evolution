@@ -10,7 +10,7 @@ var TimeManager = function(tickInterval, fn){
 }
 TimeManager.prototype.startSimulation = function(){
         this.timerID = setInterval(tick, this.tickInterval)
-} 
+}
 TimeManager.prototype.pauseSimulation = function(){
         clearInterval(this.timerID)
 }
@@ -18,7 +18,7 @@ TimeManager.prototype.setSpeed = function(tickInterval){
         tickInterval = tickInterval === undefined ? this.tickInterval : tickInterval
         clearInterval(this.timerID)
         this.tickInterval = tickInterval
-        this.timerID = setInterval(this.fn, this.tickInterval)    
+        this.timerID = setInterval(this.fn, this.tickInterval)
 }
 
 String.prototype.sluggify = function(){
@@ -85,7 +85,7 @@ function main(containerDiv, numWalkers, numConsumers, numProducers , numPeriodic
         pos.width = 100
         arena.addObject( new Blockade(pos) )
     })*/
-    
+
     topBlock = {x: 375, y:50, height:175, width:20}
     arena.addObject( new Blockade(topBlock) )
     bottomBlock = {x: 375,  y:450, height:175, width:20}
@@ -105,8 +105,8 @@ function main(containerDiv, numWalkers, numConsumers, numProducers , numPeriodic
         blockadeNodes = container.selectAll("rect.blockade").data(arena.blockades)
         blockadeNodes.enter().append("rect")
         /*
-            SVG rectangles draw with x, y being the upper left corner. 
-            Translate the center up and away 
+            SVG rectangles draw with x, y being the upper left corner.
+            Translate the center up and away
         */
         blockadeNodes.attr("x", function(d){ return d.x - d.width})
             .attr("y", function(d){ return d.y - d.height })
@@ -120,7 +120,7 @@ function main(containerDiv, numWalkers, numConsumers, numProducers , numPeriodic
 
         walkerNodes = container.selectAll(".walker").data(arena.walkers)
         walkerNodes.enter().append('circle')
-            
+
         //Seperate creation of new nodes from node updates
         walkerNodes.attr("cx", function(d) { return d.x; })
             .attr("cy", function(d) { return d.y; })
@@ -131,7 +131,7 @@ function main(containerDiv, numWalkers, numConsumers, numProducers , numPeriodic
 
         seekerNodes = container.selectAll(".seeker").data(arena.actors)
         seekerNodes.enter().append('circle')
-            
+
         //Seperate creation of new nodes from node updates
         seekerNodes.attr("cx", function(d) { return d.x; })
             .attr("cy", function(d) { return d.y; })
@@ -146,12 +146,12 @@ function main(containerDiv, numWalkers, numConsumers, numProducers , numPeriodic
     timeManager.setSpeed()
     timeManager.startSimulation = function(){
         this.timerID = setInterval(tick, this.tickInterval)
-    } 
+    }
     timeManager.pauseSimulation = function(){
         clearInterval(this.timerID)
     }
-    splineChart = populationSpline()
-    highcharts_scatter()
+/*    splineChart = populationSpline()
+    highcharts_scatter()*/
 }
 
 
@@ -161,7 +161,7 @@ function populationSpline() {
                 useUTC: false
             }
         });
-    
+
         var chartContainer = $('#plot-spline').highcharts({
             chart: {
                 type: 'spline',
@@ -172,7 +172,7 @@ function populationSpline() {
             },
             events: {
                     load: function () {
-    
+
                         // set up the updating of the chart each second
                         var series = this.series[0];
                         var series2 = this.series[1]
@@ -185,7 +185,7 @@ function populationSpline() {
                                 z = []
                                 fud = arena.walkers.length
                                 groups = _.groupBy(arena.actors, "type")
-                                
+
 
                                 a = groups['e-coli'] === undefined? 0 : groups['e-coli'].length
                                 b = groups['siderophore-producer'] === undefined? 0 : groups['siderophore-producer'].length
@@ -268,7 +268,7 @@ function highcharts_scatter() {
                 useUTC: false
             }
         });
-    
+
         var chart;
         $('#plot-scatter').highcharts({
             chart: {
@@ -277,7 +277,7 @@ function highcharts_scatter() {
                 marginRight: 10,
                 events: {
                     load: function() {
-    
+
                         // set up the updating of the chart each second
                         var series = this.series[0];
 
